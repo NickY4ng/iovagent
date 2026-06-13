@@ -33,12 +33,59 @@ interface MapPoint {
   tone: MapTone;
 }
 
+interface AgentModelOption {
+  icon?: string;
+  iconClass: string;
+  label: string;
+  logoUrl?: string;
+  value: string;
+}
+
+const agentModelOptions: AgentModelOption[] = [
+  { value: 'auto', label: '自动', icon: strokeIconPaths.zap, iconClass: 'bg-slate-100 text-slate-700' },
+  {
+    value: 'qwen-3.7',
+    label: 'Qwen-3.7',
+    logoUrl: 'https://img.alicdn.com/imgextra/i1/O1CN013ltlI61OTOnTStXfj_!!6000000001706-55-tps-330-327.svg',
+    iconClass: 'bg-white',
+  },
+  {
+    value: 'deepseek-v4-flash',
+    label: 'Deepseek-V4-Flash',
+    logoUrl: 'https://www.deepseek.com/favicon.ico',
+    iconClass: 'bg-white',
+  },
+  {
+    value: 'minimax-m3',
+    label: 'MiniMax-M3',
+    logoUrl: 'https://filecdn.minimax.chat/public/58eca777-e31f-448a-9823-e2220e49b426.png',
+    iconClass: 'bg-white',
+  },
+];
+
+const selectedAgentModel = ref(agentModelOptions[0]!);
+const isModelSelectOpen = ref(false);
+const modelSelectRef = ref<HTMLDivElement | null>(null);
+const isRightPanelVisible = ref(true);
+
 function setRightPanel(key: string) {
   store.rightPanel = key;
 }
 
+function selectAgentModel(option: AgentModelOption) {
+  selectedAgentModel.value = option;
+  isModelSelectOpen.value = false;
+}
+
+function closeModelSelectOnOutside(event: MouseEvent) {
+  if (!modelSelectRef.value?.contains(event.target as Node)) {
+    isModelSelectOpen.value = false;
+  }
+}
+
 const isOrderEventPanel = computed(() => store.visibleRightPanel === 'orderEvent');
 const isDefaultOverview = computed(() => store.visibleRightPanel === 'overview');
+const agentGridClass = computed(() => (isRightPanelVisible.value ? 'grid-cols-[minmax(0,1fr)_minmax(380px,0.96fr)]' : 'grid-cols-1'));
 
 const trendData = [
   { date: '05-09', count: 8 },
@@ -185,7 +232,7 @@ function eventCardClass(event: TimelineEvent) {
   if (event.type === 'risk') return 'border-purple-200 bg-purple-50';
   if (event.type === 'stop' && store.detailView === 'agent' && event.agentTone === 'green') return 'border-emerald-200 bg-emerald-50';
   if (event.type === 'stop') return 'border-red-200 bg-red-50';
-  return 'border-slate-200 bg-white';
+  return 'border-[#deded9] bg-white';
 }
 
 function markerIcon(tone: MapTone) {
@@ -274,6 +321,7 @@ function clearEventPanelMap() {
 }
 
 onMounted(() => {
+  document.addEventListener('click', closeModelSelectOnOutside);
   if (!import.meta.env.DEV) return;
   const { ordersSeed } = store;
   const riskOrders = getRiskOrders(ordersSeed);
@@ -295,47 +343,52 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  document.removeEventListener('click', closeModelSelectOnOutside);
   clearEventPanelMap();
 });
 </script>
 
 <template>
-  <div class="grid grid-cols-2 gap-6">
-    <div class="flex h-[calc(100vh-112px)] flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-      <div class="border-b border-slate-200 px-5 py-4">
-        <div class="flex items-start justify-between gap-4">
-          <div class="flex items-start gap-3">
-            <div class="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-              <Icon :svg="strokeIconPaths.msg" :size="18" />
-            </div>
-            <div>
-              <h1 class="text-lg font-semibold text-slate-900">智能体工作台</h1>
-              <p class="mt-0.5 text-xs text-slate-500">查询、筛选、分析和下载</p>
-            </div>
+  <div class="grid h-full overflow-hidden rounded-md border border-[#deded9] bg-white" :class="agentGridClass">
+    <div class="flex h-full flex-col overflow-hidden bg-white">
+      <div class="flex h-12 items-center justify-between gap-4 border-b border-[#e2e2dc] px-4">
+        <div class="flex items-center gap-2.5">
+          <div class="flex h-7 w-7 items-center justify-center rounded-md bg-[#f2f2ef] text-slate-700">
+            <Icon :svg="strokeIconPaths.msg" :size="16" />
+          </div>
+          <div>
+            <h1 class="text-sm font-semibold leading-5 text-slate-950">智能体工作台</h1>
           </div>
         </div>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded-md border border-[#deded9] bg-[#f7f7f5] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-950"
+          @click="isRightPanelVisible = !isRightPanelVisible"
+        >
+          <Icon :svg="strokeIconPaths.chevron" :size="13" :svg-class="isRightPanelVisible ? 'rotate-180' : ''" />
+          {{ isRightPanelVisible ? '隐藏右栏' : '显示右栏' }}
+        </button>
       </div>
-      <div class="flex-1 space-y-4 overflow-auto bg-slate-50 p-5">
+      <div class="flex-1 space-y-4 overflow-auto bg-[#fbfbfa] p-4">
         <div v-for="(m, i) in agentMessages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
           <div
             class="rounded-md px-4 py-3 text-sm leading-6"
             :class="[
-              m.role === 'user' ? 'max-w-[72%] bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700',
+              m.role === 'user' ? 'max-w-[72%] bg-slate-900 text-white' : 'border border-[#deded9] bg-white text-slate-700',
               m.title ? 'max-w-[86%]' : 'max-w-[72%]',
             ]"
           >
             <template v-if="m.role === 'agent' && m.title">
-              <div class="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+              <div class="mb-3 flex items-center justify-between gap-3 border-b border-[#ededea] pb-2">
                 <div>
                   <div class="text-sm font-semibold text-slate-900">{{ m.title }}</div>
-                  <div class="mt-0.5 text-xs text-slate-400">任务执行记录</div>
                 </div>
                 <span class="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ m.status }}</span>
               </div>
-              <div v-if="m.text" class="mb-3 rounded-md bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+              <div v-if="m.text" class="mb-3 rounded-md bg-[#f7f7f5] px-3 py-2 text-xs leading-5 text-slate-500">
                 {{ m.text }}
               </div>
-              <div v-if="m.steps?.length" class="divide-y divide-slate-100 rounded-md border border-slate-100 bg-white">
+              <div v-if="m.steps?.length" class="divide-y divide-[#ededea] rounded-md border border-[#deded9] bg-white">
                 <div v-for="(step, stepIndex) in m.steps" :key="step.title" class="grid grid-cols-[82px_1fr] gap-2 px-3 py-1.5">
                   <div class="text-[11px] font-semibold leading-5 text-slate-900">0{{ stepIndex + 1 }} · {{ step.title }}</div>
                   <div class="min-w-0 text-xs leading-5 text-slate-500">
@@ -353,104 +406,149 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <div class="border-t border-slate-200 bg-white p-4">
+      <div class="border-t border-[#e2e2dc] bg-white p-3">
         <div class="mb-3 flex flex-wrap items-center gap-2">
           <span class="mr-1 text-xs font-medium text-slate-500">推荐指令</span>
           <button
             v-for="s in quickPrompts"
             :key="s"
             type="button"
-            class="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 hover:border-slate-400 hover:text-slate-900"
+            class="rounded-md border border-[#deded9] bg-[#f7f7f5] px-3 py-1.5 text-xs text-slate-600 hover:bg-white hover:text-slate-900"
             @click="sendAgent(s)"
           >
             {{ s }}
           </button>
         </div>
-        <div class="rounded-md border border-[#dbe3ee] bg-white px-3 py-2 shadow-[0_10px_28px_rgba(15,23,42,0.08)]">
+        <div class="rounded-md border border-[#deded9] bg-white px-3 py-2">
           <textarea
             v-model="agentInput"
             class="min-h-[64px] w-full resize-none bg-transparent text-sm leading-7 text-slate-800 outline-none"
             placeholder="输入查询，例如：今天有哪些异常运单"
             @keydown.enter.exact.prevent="sendAgent()"
           />
-          <div class="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
-            <div class="text-xs text-slate-400">Enter 发送，Shift Enter 换行</div>
+          <div class="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2">
+            <div class="flex min-w-0 items-center gap-3">
+              <div class="shrink-0 text-xs text-slate-400">Enter 发送，Shift Enter 换行</div>
+              <div ref="modelSelectRef" class="relative">
+                <button
+                  type="button"
+                  role="combobox"
+                  aria-haspopup="listbox"
+                  :aria-expanded="isModelSelectOpen"
+                  class="flex h-8 min-w-[156px] items-center justify-between gap-2 rounded-md border border-[#deded9] bg-[#f7f7f5] px-2.5 text-xs text-slate-700 transition hover:bg-white"
+                  @click.stop="isModelSelectOpen = !isModelSelectOpen"
+                >
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-slate-100" :class="selectedAgentModel.iconClass">
+                      <img
+                        v-if="selectedAgentModel.logoUrl"
+                        :src="selectedAgentModel.logoUrl"
+                        :alt="`${selectedAgentModel.label} logo`"
+                        class="h-4 w-4 object-contain"
+                      />
+                      <Icon v-else :svg="selectedAgentModel.icon" :size="13" />
+                    </span>
+                    <span class="truncate">{{ selectedAgentModel.label }}</span>
+                  </span>
+                  <Icon :svg="strokeIconPaths.chevron" :size="13" svg-class="shrink-0 text-slate-400 rotate-90" />
+                </button>
+                <div v-if="isModelSelectOpen" class="absolute bottom-full left-0 z-30 mb-2 w-64 rounded-md border border-[#deded9] bg-white p-1 shadow-xl" role="listbox">
+                  <div class="px-2 py-1.5 text-xs font-medium text-slate-500">内置模型</div>
+                  <button
+                    v-for="option in agentModelOptions"
+                    :key="option.value"
+                    type="button"
+                    role="option"
+                    :aria-selected="selectedAgentModel.value === option.value"
+                    class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition hover:bg-[#f7f7f5]"
+                    :class="selectedAgentModel.value === option.value ? 'text-slate-900' : 'text-slate-600'"
+                    @click="selectAgentModel(option)"
+                  >
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" :class="option.iconClass">
+                      <img v-if="option.logoUrl" :src="option.logoUrl" :alt="`${option.label} logo`" class="h-5 w-5 object-contain" />
+                      <Icon v-else :svg="option.icon" :size="15" />
+                    </span>
+                    <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
+                    <Icon v-if="selectedAgentModel.value === option.value" :svg="strokeIconPaths.check" :size="15" svg-class="text-slate-900" />
+                  </button>
+                </div>
+              </div>
+            </div>
             <button type="button" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" @click="sendAgent()">发送</button>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="flex h-[calc(100vh-112px)] flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-      <div class="border-b border-slate-200" :class="isDefaultOverview ? 'p-5' : 'px-5 py-3'">
-        <div class="flex items-start justify-between gap-4" :class="isDefaultOverview ? 'mb-4' : 'mb-3'">
-          <div>
-            <h2 class="text-lg font-semibold text-slate-900">
-              {{ isOrderEventPanel ? '只看皖K55821异常停车事件' : isDefaultOverview ? '今日在途情况' : '今日在途预警处理结果' }}
-            </h2>
-            <p class="mt-0.5 text-xs text-slate-500">
-              {{ isOrderEventPanel ? 'WB20260509018 · 合肥仓 → 南京仓' : isDefaultOverview ? '预警汇总、运单结果、分析结论' : '高风险异常运单、判定理由、低风险过滤说明' }}
-            </p>
-          </div>
-          <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('green')">实时同步</span>
+    <div v-if="isRightPanelVisible" class="flex h-full flex-col overflow-hidden border-l border-[#deded9] bg-[#fafaf8]">
+      <div class="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-[#e2e2dc] px-4">
+        <div>
+          <h2 class="text-sm font-semibold leading-5 text-slate-950">
+            {{ isOrderEventPanel ? '只看皖K55821异常停车事件' : isDefaultOverview ? '今日在途情况' : '今日在途预警处理结果' }}
+          </h2>
         </div>
-        <div v-if="isDefaultOverview" class="grid grid-cols-4 gap-3">
-          <div class="rounded-md bg-slate-50 p-4">
+        <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('green')">实时同步</span>
+      </div>
+      <div v-if="isDefaultOverview" class="border-b border-[#e2e2dc] p-4">
+        <div class="grid grid-cols-4 gap-3">
+          <div class="rounded-md bg-[#f7f7f5] p-3">
             <div class="text-xs text-slate-500">监控运单</div>
-            <div class="mt-1 text-2xl font-semibold text-slate-900">128</div>
+            <div class="mt-1 text-xl font-semibold text-slate-900">128</div>
           </div>
-          <div class="rounded-md bg-slate-50 p-4">
+          <div class="rounded-md bg-[#f7f7f5] p-3">
             <div class="text-xs text-slate-500">异常运单</div>
-            <div class="mt-1 text-2xl font-semibold text-red-600">17</div>
+            <div class="mt-1 text-xl font-semibold text-red-600">17</div>
           </div>
-          <div class="rounded-md bg-slate-50 p-4">
+          <div class="rounded-md bg-[#f7f7f5] p-3">
             <div class="text-xs text-slate-500">高风险</div>
-            <div class="mt-1 text-2xl font-semibold text-red-600">6</div>
+            <div class="mt-1 text-xl font-semibold text-red-600">6</div>
           </div>
-          <div class="rounded-md bg-slate-50 p-4">
+          <div class="rounded-md bg-[#f7f7f5] p-3">
             <div class="text-xs text-slate-500">低风险</div>
-            <div class="mt-1 text-2xl font-semibold text-orange-600">11</div>
+            <div class="mt-1 text-xl font-semibold text-orange-600">11</div>
           </div>
         </div>
-        <div v-else-if="!isOrderEventPanel" class="grid grid-cols-4 gap-2">
-          <div class="rounded-md bg-slate-50 px-3 py-2">
+      </div>
+      <div v-else-if="!isOrderEventPanel" class="border-b border-[#e2e2dc] px-4 py-3">
+        <div class="grid grid-cols-4 gap-2">
+          <div class="rounded-md bg-[#f7f7f5] px-3 py-2">
             <div class="text-[11px] text-slate-500">处理预警</div>
             <div class="mt-0.5 text-xl font-semibold text-slate-900">17</div>
           </div>
-          <div class="rounded-md bg-slate-50 px-3 py-2">
+          <div class="rounded-md bg-[#f7f7f5] px-3 py-2">
             <div class="text-[11px] text-slate-500">真实高风险</div>
             <div class="mt-0.5 text-xl font-semibold text-red-600">5</div>
           </div>
-          <div class="rounded-md bg-slate-50 px-3 py-2">
+          <div class="rounded-md bg-[#f7f7f5] px-3 py-2">
             <div class="text-[11px] text-slate-500">合理低风险</div>
             <div class="mt-0.5 text-xl font-semibold text-emerald-600">11</div>
           </div>
-          <div class="rounded-md bg-slate-50 px-3 py-2">
+          <div class="rounded-md bg-[#f7f7f5] px-3 py-2">
             <div class="text-[11px] text-slate-500">轨迹造假</div>
             <div class="mt-0.5 text-xl font-semibold text-red-600">1</div>
           </div>
         </div>
       </div>
-      <div v-if="!isOrderEventPanel" class="border-b border-slate-200 bg-white px-5" :class="isDefaultOverview ? 'py-3' : 'py-2'">
-        <div class="flex rounded-md bg-slate-100 p-1 text-sm">
+      <div v-if="!isOrderEventPanel" class="border-b border-[#e2e2dc] bg-white px-4" :class="isDefaultOverview ? 'py-3' : 'py-2'">
+        <div class="flex rounded-md bg-[#f2f2ef] p-1 text-sm">
           <button
             v-for="[key, label] in rightPanelTabs"
             :key="key"
             type="button"
-            class="flex-1 rounded-lg px-3"
-            :class="[isDefaultOverview ? 'py-2' : 'py-1.5', store.visibleRightPanel === key ? 'bg-white font-medium shadow-sm' : 'text-slate-500']"
+            class="flex-1 rounded-md px-3"
+            :class="[isDefaultOverview ? 'py-2' : 'py-1.5', store.visibleRightPanel === key ? 'bg-white font-medium' : 'text-slate-500']"
             @click="setRightPanel(key)"
           >
             {{ label }}
           </button>
         </div>
       </div>
-      <div class="flex-1 overflow-auto bg-slate-50 p-5">
+      <div class="flex-1 overflow-auto bg-[#f7f7f5] p-4">
         <div v-if="store.visibleRightPanel === 'orderEvent'" class="space-y-4">
-          <div class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+          <div class="overflow-hidden rounded-md border border-[#deded9] bg-white">
             <div class="relative h-[260px] overflow-hidden">
               <div ref="panelMapRef" class="h-full w-full"></div>
-              <div class="pointer-events-none absolute top-3 left-3 z-[1000] rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-700 shadow">
+              <div class="pointer-events-none absolute top-3 left-3 z-[1000] rounded-md border border-[#deded9] bg-white/95 px-3 py-2 text-xs text-slate-700">
                 <div class="font-semibold text-slate-900">合肥仓 → 南京仓</div>
                 <div class="mt-1 flex gap-3 text-slate-500">
                   <span>{{ panelRouteDistance }}</span>
@@ -459,15 +557,15 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div class="pointer-events-none absolute top-3 right-3 z-[1000] flex gap-2">
-                <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium shadow-sm" :class="badgeToneClass('green')">低风险停车 1</span>
-                <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium shadow-sm" :class="badgeToneClass('red')">高风险停车 1</span>
+                <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('green')">低风险停车 1</span>
+                <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('red')">高风险停车 1</span>
               </div>
             </div>
           </div>
 
-          <div class="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <div class="mb-3 flex items-center justify-between gap-2">
-              <div class="text-sm font-semibold">事件 Timeline</div>
+          <div class="overflow-hidden rounded-md border border-[#deded9] bg-white">
+            <div class="flex h-12 items-center justify-between gap-2 border-b border-[#e2e2dc] px-4">
+              <div class="text-sm font-semibold leading-5">事件 Timeline</div>
               <button
                 type="button"
                 class="rounded-md px-3 py-2 text-xs font-medium"
@@ -477,25 +575,25 @@ onBeforeUnmount(() => {
                 <Icon :svg="strokeIconPaths.filter" :size="14" svg-class="mr-1 inline" /> 只看异常停车
               </button>
             </div>
-            <div class="mb-3 flex rounded-md bg-slate-100 p-1 text-xs">
+            <div class="m-4 flex rounded-md bg-[#f2f2ef] p-1 text-xs">
               <button
                 type="button"
-                class="flex-1 rounded-lg px-3 py-2"
-                :class="store.detailView === 'agent' ? 'bg-white shadow-sm' : 'text-slate-500'"
+                class="flex-1 rounded-md px-3 py-2"
+                :class="store.detailView === 'agent' ? 'bg-white' : 'text-slate-500'"
                 @click="store.detailView = 'agent'"
               >
                 智能体判断
               </button>
               <button
                 type="button"
-                class="flex-1 rounded-lg px-3 py-2"
-                :class="store.detailView === 'rule' ? 'bg-white shadow-sm' : 'text-slate-500'"
+                class="flex-1 rounded-md px-3 py-2"
+                :class="store.detailView === 'rule' ? 'bg-white' : 'text-slate-500'"
                 @click="store.detailView = 'rule'"
               >
                 规则判断
               </button>
             </div>
-            <div class="space-y-3">
+            <div class="space-y-3 px-4 pb-4">
               <div v-for="e in eventPanelVisibleTimeline" :key="e.id" class="rounded-md border p-3" :class="eventCardClass(e)">
                 <div class="flex items-center justify-between gap-3">
                   <div class="text-sm font-medium">
@@ -529,12 +627,12 @@ onBeforeUnmount(() => {
 
         <div v-else-if="store.visibleRightPanel === 'overview'" class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
-            <div class="rounded-md border border-slate-200 bg-white p-4">
+            <div class="rounded-md border border-[#deded9] bg-white p-4">
               <div class="mb-3 flex items-center justify-between">
                 <div class="text-sm font-semibold">近 7 天异常趋势</div>
                 <span class="text-xs text-slate-400">单位：单</span>
               </div>
-              <div class="h-40 rounded-md bg-slate-50 px-3 pb-3 pt-5">
+              <div class="h-40 rounded-md bg-[#f7f7f5] px-3 pb-3 pt-5">
                 <div class="grid h-full grid-rows-[1fr_12px] gap-1">
                   <div class="flex items-end gap-2">
                     <div v-for="item in trendData" :key="`bar-${item.date}`" class="flex h-full flex-1 flex-col items-center justify-end gap-1">
@@ -548,7 +646,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             </div>
-            <div class="rounded-md border border-slate-200 bg-white p-4">
+            <div class="rounded-md border border-[#deded9] bg-white p-4">
               <div class="mb-3 text-sm font-semibold">今日风险TOP3</div>
               <div class="space-y-3 text-sm">
                 <div>
@@ -572,7 +670,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <div class="rounded-md border border-slate-200 bg-white p-4">
+          <div class="rounded-md border border-[#deded9] bg-white p-4">
             <div class="mb-3 flex items-center justify-between">
               <div class="text-sm font-semibold">智能体结论</div>
               <button type="button" class="text-xs font-medium text-slate-900" @click="goPage('analytics')">查看统计归因</button>
@@ -580,19 +678,19 @@ onBeforeUnmount(() => {
             <div class="space-y-3 text-sm text-slate-700">
               <div class="rounded-md bg-red-50 p-3 text-red-700">今日异常率 13.3%，较昨日上升 2.1 个百分点。</div>
               <div class="rounded-md bg-orange-50 p-3 text-orange-700">异常主要集中在安捷物流和上海工厂 → 广州仓线路。</div>
-              <div class="rounded-md bg-slate-50 p-3">建议优先复核非目的地物流园长停，以及 GPS 高风险轨迹段。</div>
+              <div class="rounded-md bg-[#f7f7f5] p-3">建议优先复核非目的地物流园长停，以及 GPS 高风险轨迹段。</div>
             </div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <button type="button" class="rounded-md bg-slate-900 px-4 py-3 text-sm font-medium text-white" @click="goPage('risk')">查看异常运单</button>
-            <button type="button" class="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700" @click="goPage('orders')">
+            <button type="button" class="rounded-md border border-[#deded9] bg-white px-4 py-3 text-sm font-medium text-slate-700" @click="goPage('orders')">
               查看全部运单
             </button>
           </div>
         </div>
 
         <div v-else-if="store.visibleRightPanel === 'risk'" class="space-y-4">
-          <div class="rounded-md border border-slate-200 bg-white p-3">
+          <div class="rounded-md border border-[#deded9] bg-white p-3">
             <div class="mb-2 flex items-center justify-between">
               <div class="text-sm font-semibold">高风险异常运单</div>
               <button type="button" class="text-xs font-medium text-slate-900" @click="goPage('risk')">进入列表</button>
@@ -609,10 +707,10 @@ onBeforeUnmount(() => {
                   <span class="shrink-0 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">高风险</span>
                 </div>
                 <div class="mt-3 flex flex-wrap gap-2">
-                  <span class="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">停靠点：{{ o.stopPoint }}</span>
+                  <span class="rounded-md bg-[#f7f7f5] px-2 py-1 text-xs text-slate-600">停靠点：{{ o.stopPoint }}</span>
                   <span class="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{{ o.type }}</span>
                 </div>
-                <div class="mt-2 rounded-md bg-slate-50 px-3 py-2 leading-6 text-slate-600">
+                <div class="mt-2 rounded-md bg-[#f7f7f5] px-3 py-2 leading-6 text-slate-600">
                   {{ o.reason }}
                 </div>
               </div>

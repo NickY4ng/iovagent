@@ -102,7 +102,7 @@ function eventCardClass(event: TimelineEvent) {
   if (event.type === 'risk') return 'border-purple-200 bg-purple-50';
   if (event.type === 'stop' && store.detailView === 'agent' && event.agentTone === 'green') return 'border-emerald-200 bg-emerald-50';
   if (event.type === 'stop') return 'border-red-200 bg-red-50';
-  return 'border-slate-200 bg-white';
+  return 'border-[#deded9] bg-white';
 }
 
 function formatDuration(seconds: number) {
@@ -250,21 +250,20 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col space-y-4">
-    <div class="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <div class="mb-5 flex items-start justify-between gap-4">
-        <div class="flex items-start gap-3">
-          <div class="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-            <Icon :svg="strokeIconPaths.map" :size="18" />
+  <div class="flex h-full flex-col space-y-3">
+    <div class="overflow-hidden rounded-md border border-[#deded9] bg-white">
+      <div class="flex h-12 items-center justify-between gap-4 border-b border-[#e2e2dc] px-4">
+        <div class="flex items-center gap-2.5">
+          <div class="flex h-7 w-7 items-center justify-center rounded-md bg-[#f2f2ef] text-slate-700">
+            <Icon :svg="strokeIconPaths.map" :size="16" />
           </div>
           <div>
-            <h1 class="text-xl font-semibold text-slate-900">运单详情与地图轨迹</h1>
-            <p class="mt-1 text-sm text-slate-500">{{ store.currentDetailOrder.id }} · {{ store.currentDetailOrder.plate }}</p>
+            <h1 class="text-sm font-semibold leading-5 text-slate-950">运单详情与地图轨迹</h1>
           </div>
         </div>
       </div>
-      <div class="grid grid-cols-6 gap-3 text-sm">
-        <div v-for="row in store.detailInfoRows" :key="row.label" class="rounded-md bg-slate-50 p-3">
+      <div class="grid grid-cols-6 gap-3 p-4 text-sm">
+        <div v-for="row in store.detailInfoRows" :key="row.label" class="rounded-md bg-[#f7f7f5] p-3">
           <div class="text-xs text-slate-500">
             {{ row.label }}
           </div>
@@ -275,9 +274,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <div class="grid h-0 flex-1 grid-cols-[1.15fr_0.85fr] gap-4">
-      <div class="flex h-full flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-        <div class="flex items-center justify-between border-b border-slate-200 p-4">
-          <div class="font-semibold">地图轨迹</div>
+      <div class="flex h-full flex-col overflow-hidden rounded-md border border-[#deded9] bg-white">
+        <div class="flex h-12 items-center justify-between border-b border-[#e2e2dc] px-4">
+          <div class="text-sm font-semibold leading-5">地图轨迹</div>
           <div class="flex gap-2">
             <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('red')">异常停车点 2</span>
             <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('purple')">轨迹造假高风险段 1</span>
@@ -285,7 +284,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="relative min-h-[590px] flex-1 overflow-hidden">
           <div ref="mapRef" class="h-full min-h-[590px] w-full"></div>
-          <div class="pointer-events-none absolute top-4 left-4 z-[1000] rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-700 shadow">
+          <div class="pointer-events-none absolute top-4 left-4 z-[1000] rounded-md border border-[#deded9] bg-white/95 px-3 py-2 text-xs text-slate-700">
             <div class="font-semibold text-slate-900">上海一厂 → 广州仓</div>
             <div class="mt-1 flex gap-3 text-slate-500">
               <span>{{ routeDistance }}</span>
@@ -295,9 +294,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <div class="flex h-full flex-col rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <div class="mb-4 flex items-center justify-between gap-2">
-          <div class="font-semibold">事件 Timeline</div>
+      <div class="flex h-full flex-col overflow-hidden rounded-md border border-[#deded9] bg-white">
+        <div class="flex h-12 items-center justify-between gap-2 border-b border-[#e2e2dc] px-3">
+          <div class="text-sm font-semibold leading-5">事件 Timeline</div>
           <button
             type="button"
             class="rounded-md px-3 py-2 text-xs font-medium"
@@ -307,25 +306,25 @@ onBeforeUnmount(() => {
             <Icon :svg="strokeIconPaths.filter" :size="14" svg-class="mr-1 inline" /> 只看异常事件
           </button>
         </div>
-        <div class="mb-4 flex rounded-md bg-slate-100 p-1 text-xs">
+        <div class="m-3 flex rounded-md bg-[#f2f2ef] p-1 text-xs">
           <button
             type="button"
-            class="flex-1 rounded-lg px-3 py-2"
-            :class="store.detailView === 'agent' ? 'bg-white shadow-sm' : 'text-slate-500'"
+            class="flex-1 rounded-md px-3 py-2"
+            :class="store.detailView === 'agent' ? 'bg-white' : 'text-slate-500'"
             @click="store.detailView = 'agent'"
           >
             智能体判断
           </button>
           <button
             type="button"
-            class="flex-1 rounded-lg px-3 py-2"
-            :class="store.detailView === 'rule' ? 'bg-white shadow-sm' : 'text-slate-500'"
+            class="flex-1 rounded-md px-3 py-2"
+            :class="store.detailView === 'rule' ? 'bg-white' : 'text-slate-500'"
             @click="store.detailView = 'rule'"
           >
             规则判断
           </button>
         </div>
-        <div class="max-h-[530px] space-y-3 overflow-auto pr-1">
+        <div class="max-h-[530px] space-y-3 overflow-auto px-3 pb-3">
           <div
             v-for="e in store.timelineEvents"
             :key="e.id"

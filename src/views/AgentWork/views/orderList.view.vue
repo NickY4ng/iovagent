@@ -40,27 +40,24 @@ function generateRiskBrief() {
 </script>
 
 <template>
-  <div class="flex h-full flex-col space-y-4">
-    <div class="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <div class="mb-5 flex items-start justify-between gap-4">
-        <div class="flex items-start gap-3">
-          <div class="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-            <Icon :svg="strokeIconPaths.list" :size="18" />
+  <div class="flex h-full flex-col space-y-3">
+    <div class="overflow-hidden rounded-md border border-[#deded9] bg-white">
+      <div class="flex h-12 items-center justify-between gap-4 border-b border-[#e2e2dc] px-4">
+        <div class="flex items-center gap-2.5">
+          <div class="flex h-7 w-7 items-center justify-center rounded-md bg-[#f2f2ef] text-slate-700">
+            <Icon :svg="strokeIconPaths.list" :size="16" />
           </div>
           <div>
-            <h1 class="text-xl font-semibold text-slate-900">
+            <h1 class="text-sm font-semibold leading-5 text-slate-950">
               {{ isOrders() ? '运单列表' : '异常运单列表' }}
             </h1>
-            <p class="mt-1 text-sm text-slate-500">
-              {{ isOrders() ? '当前项目全部运单' : '高风险、低风险运单' }}
-            </p>
           </div>
         </div>
         <div class="flex gap-2">
           <button
             v-if="!isOrders()"
             type="button"
-            class="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 hover:text-slate-900"
+            class="rounded-md border border-[#deded9] bg-[#f7f7f5] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white hover:text-slate-900"
             @click="generateRiskBrief()"
           >
             生成简报
@@ -74,33 +71,33 @@ function generateRiskBrief() {
           </button>
         </div>
       </div>
-      <div v-if="isOrders()" class="grid grid-cols-4 gap-3">
-        <div class="rounded-md bg-slate-50 p-4">
+      <div v-if="isOrders()" class="grid grid-cols-4 gap-3 p-4">
+        <div class="rounded-md bg-[#f7f7f5] p-3">
           <div class="text-xs text-slate-500">全部</div>
-          <div class="mt-1 text-2xl font-semibold text-slate-900">
+          <div class="mt-1 text-xl font-semibold text-slate-900">
             {{ ordersSeed?.length }}
           </div>
         </div>
-        <div class="rounded-md bg-slate-50 p-4">
+        <div class="rounded-md bg-[#f7f7f5] p-3">
           <div class="text-xs text-slate-500">高风险</div>
-          <div class="mt-1 text-2xl font-semibold text-red-600">
+          <div class="mt-1 text-xl font-semibold text-red-600">
             {{ ordersSeed.filter((o) => o.risk === '高风险').length }}
           </div>
         </div>
-        <div class="rounded-md bg-slate-50 p-4">
+        <div class="rounded-md bg-[#f7f7f5] p-3">
           <div class="text-xs text-slate-500">低风险</div>
-          <div class="mt-1 text-2xl font-semibold text-orange-600">
+          <div class="mt-1 text-xl font-semibold text-orange-600">
             {{ ordersSeed.filter((o) => o.risk === '低风险').length }}
           </div>
         </div>
-        <div class="rounded-md bg-slate-50 p-4">
+        <div class="rounded-md bg-[#f7f7f5] p-3">
           <div class="text-xs text-slate-500">无风险</div>
-          <div class="mt-1 text-2xl font-semibold text-emerald-600">
+          <div class="mt-1 text-xl font-semibold text-emerald-600">
             {{ ordersSeed.filter((o) => o.risk === '无风险').length }}
           </div>
         </div>
       </div>
-      <div v-else class="rounded-md border border-orange-200 bg-orange-50 px-4 py-3">
+      <div v-else class="m-4 rounded-md border border-orange-200 bg-orange-50 px-4 py-3">
         <div class="flex items-start gap-3">
           <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-orange-100 text-orange-700">
             <Icon :svg="strokeIconPaths.shield" :size="14" />
@@ -114,12 +111,12 @@ function generateRiskBrief() {
         </div>
       </div>
     </div>
-    <div class="flex h-0 flex-1 flex-col rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex h-0 flex-1 flex-col rounded-md border border-[#deded9] bg-white p-3">
       <div class="mb-4 flex flex-wrap items-end gap-3">
         <template v-if="isOrders()">
           <label class="text-xs text-slate-500">
             <span class="mb-1 block">时间筛选</span>
-            <div class="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3">
+            <div class="flex min-h-[40px] items-center gap-2 rounded-md border border-[#deded9] bg-[#fbfbfa] px-3">
               <input
                 v-model="ordersStartDate"
                 type="date"
@@ -137,7 +134,7 @@ function generateRiskBrief() {
           </label>
           <label class="text-xs text-slate-500"
             ><span class="mb-1 block">风险状态</span>
-            <select v-model="ordersRiskFilter" class="min-h-[40px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+            <select v-model="ordersRiskFilter" class="min-h-[40px] rounded-md border border-[#deded9] bg-[#fbfbfa] px-3 py-2 text-sm text-slate-700">
               <option>全部</option>
               <option>高风险</option>
               <option>低风险</option>
@@ -146,7 +143,7 @@ function generateRiskBrief() {
           </label>
           <label class="text-xs text-slate-500"
             ><span class="mb-1 block">运单状态</span>
-            <select v-model="ordersStatusFilter" class="min-h-[40px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+            <select v-model="ordersStatusFilter" class="min-h-[40px] rounded-md border border-[#deded9] bg-[#fbfbfa] px-3 py-2 text-sm text-slate-700">
               <option>全部</option>
               <option>在途</option>
               <option>装货中</option>
@@ -156,7 +153,7 @@ function generateRiskBrief() {
           </label>
           <label class="min-w-[280px] flex-1 text-xs text-slate-500"
             ><span class="mb-1 block">关键词</span>
-            <div class="flex min-h-[40px] items-center rounded-lg border border-slate-200 bg-white px-3">
+            <div class="flex min-h-[40px] items-center rounded-md border border-[#deded9] bg-[#fbfbfa] px-3">
               <Icon :svg="strokeIconPaths.search" :size="15" svg-class="text-slate-400" />
               <input v-model="ordersKeyword" class="w-full px-2 py-2 text-sm outline-none" placeholder="运单号 / 车牌 / 承运商 / 线路" />
             </div>
@@ -165,7 +162,7 @@ function generateRiskBrief() {
         <template v-else>
           <label class="text-xs text-slate-500">
             <span class="mb-1 block">开始时间</span>
-            <div class="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3">
+            <div class="flex min-h-[40px] items-center gap-2 rounded-md border border-[#deded9] bg-[#fbfbfa] px-3">
               <input
                 v-model="ordersStartDate"
                 type="date"
@@ -183,7 +180,7 @@ function generateRiskBrief() {
           </label>
           <label class="text-xs text-slate-500"
             ><span class="mb-1 block">风险分组</span>
-            <select v-model="riskOrdersRisk" class="min-h-[40px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+            <select v-model="riskOrdersRisk" class="min-h-[40px] rounded-md border border-[#deded9] bg-[#fbfbfa] px-3 py-2 text-sm text-slate-700">
               <option>全部异常</option>
               <option>高风险</option>
               <option>低风险</option>
@@ -191,7 +188,7 @@ function generateRiskBrief() {
           </label>
           <label class="text-xs text-slate-500"
             ><span class="mb-1 block">风险来源</span>
-            <select v-model="riskOrdersSource" class="min-h-[40px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+            <select v-model="riskOrdersSource" class="min-h-[40px] rounded-md border border-[#deded9] bg-[#fbfbfa] px-3 py-2 text-sm text-slate-700">
               <option>全部来源</option>
               <option>规则预警</option>
               <option>智能轨迹分析</option>
@@ -200,16 +197,16 @@ function generateRiskBrief() {
           </label>
           <label class="min-w-[320px] flex-1 text-xs text-slate-500"
             ><span class="mb-1 block">关键词</span>
-            <div class="flex min-h-[40px] items-center rounded-lg border border-slate-200 bg-white px-3">
+            <div class="flex min-h-[40px] items-center rounded-md border border-[#deded9] bg-[#fbfbfa] px-3">
               <Icon :svg="strokeIconPaths.search" :size="15" svg-class="text-slate-400" />
               <input v-model="riskOrdersKeyword" class="w-full px-2 py-2 text-sm outline-none" placeholder="搜索异常运单 / 车牌 / 异常类型 / 承运商" />
             </div>
           </label>
         </template>
       </div>
-      <div class="h-0 flex-1 overflow-y-auto rounded-md border border-slate-200">
+      <div class="h-0 flex-1 overflow-y-auto rounded-md border border-[#deded9]">
         <table class="w-full border-collapse text-left text-sm">
-          <thead class="bg-slate-50">
+          <thead class="bg-[#f7f7f5]">
             <tr class="text-xs font-semibold text-slate-500">
               <th class="px-4 py-3 align-middle">运单</th>
               <th class="px-4 py-3 align-middle">线路</th>
@@ -220,8 +217,8 @@ function generateRiskBrief() {
               <th class="px-4 py-3 align-middle">操作</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100 bg-white">
-            <tr v-for="o in isOrders() ? store.ordersFiltered : store.riskOrdersFiltered" :key="o.id" class="hover:bg-slate-50/80">
+          <tbody class="divide-y divide-[#ededea] bg-white">
+            <tr v-for="o in isOrders() ? store.ordersFiltered : store.riskOrdersFiltered" :key="o.id" class="hover:bg-[#f7f7f5]">
               <td class="px-4 py-4 align-middle">
                 <div class="font-semibold text-slate-900">
                   {{ o.id }}
@@ -252,7 +249,7 @@ function generateRiskBrief() {
               <td class="px-4 py-4 align-middle">
                 <button
                   type="button"
-                  class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-900 hover:text-white"
+                  class="rounded-md border border-[#deded9] px-3 py-1.5 text-xs hover:bg-slate-900 hover:text-white"
                   @click="openOrderDetail(o)"
                 >
                   查看详情

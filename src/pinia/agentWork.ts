@@ -3,6 +3,7 @@ import type { ChatMessage, DownloadTask, Order, PageId, Project, TimelineEvent }
 import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
 
+import { extractMcpPrompt, runMcpPrompt } from '@/views/AgentWork/mcpClient';
 import { getRiskOrders, summarizeOrders } from '@/views/AgentWork/utils';
 
 const defaultOrdersDateRange = {
@@ -408,12 +409,18 @@ export const agentWorkData = defineStore('agentWork', {
       this.ordersEndDate = defaultOrdersDateRange.end;
     },
     /** 智能体对话：由调用方传入 `navigate`，避免 store 依赖 router */
-    appendAgentExchange(text: string | undefined, navigate: (page: PageId) => void) {
+    async appendAgentExchange(text: string | undefined, navigate: (page: PageId) => void) {
       clearAgentProcessTimers();
       const raw = text ?? this.agentInput;
       if (!raw.trim()) return;
       const next: ChatMessage[] = [...this.agentMessages, { role: 'user', text: raw }];
+      const mcpPrompt = extractMcpPrompt(raw);
       let replyMessage: ChatMessage = { role: 'agent', text: '已处理你的请求。结果已显示在右侧面板。' };
+      if (mcpPrompt) {
+        await this.startMcpPromptTest(next, mcpPrompt);
+        this.agentInput = '';
+        return;
+      }
       if (raw.includes('在途预警') || raw.includes('真有风险')) {
         this.startDelayedAgentProcess(next, createWarningProcessMessage('右侧面板已更新为今日在途预警处理结果。'), () => {
           this.rightPanel = 'risk';
@@ -489,6 +496,45 @@ export const agentWorkData = defineStore('agentWork', {
         }, processStepInitialDelay + stepIndex * processStepInterval);
         agentProcessTimers.push(timer);
       });
+    },
+    async startMcpPromptTest(next: ChatMessage[], prompt: string) {
+      const messageIndex = next.length;
+      this.agentMessages = [
+        ...next,
+        {
+          role: 'agent',
+          title: '外部 MCP prompt 测试',
+          status: '调用中',
+          text: '',
+          steps: [
+            { title: '连接服务', text: '通过本地 Vite 代理连接 shuziren-mcp-server。' },
+            { title: '发送 Prompt', text: prompt },
+          ],
+          result: '',
+        },
+      ];
+
+      try {
+        const result = await runMcpPrompt(prompt);
+        this.agentMessages = this.agentMessages.map((message, index) => {
+          if (index !== messageIndex) return message;
+          return {
+            ...message,
+            result: result.detail.slice(0, 3000),
+            status: '已完成',
+            title: result.title,
+          };
+        });
+      } catch (error) {
+        this.agentMessages = this.agentMessages.map((message, index) => {
+          if (index !== messageIndex) return message;
+          return {
+            ...message,
+            result: error instanceof Error ? error.message : 'MCP 调用失败，请检查本地代理配置和服务状态。',
+            status: '失败',
+          };
+        });
+      }
     },
   },
 });

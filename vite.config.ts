@@ -7,6 +7,14 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const mcpProxyHeaders: Record<string, string> = {};
+
+  if (env.MCP_AUTHORIZATION) {
+    mcpProxyHeaders.Authorization = env.MCP_AUTHORIZATION;
+  }
+  if (env.MCP_PROJECT_ID) {
+    mcpProxyHeaders['x-szr-projectid'] = env.MCP_PROJECT_ID;
+  }
 
   return {
     base: env.VITE_BASE || '/',
@@ -26,6 +34,16 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: Number(env.VITE_PORT || 5803),
+      proxy: env.MCP_TARGET
+        ? {
+            '/mcp-proxy': {
+              target: env.MCP_TARGET,
+              changeOrigin: true,
+              headers: mcpProxyHeaders,
+              rewrite: (path) => path.replace(/^\/mcp-proxy/, '/mcp'),
+            },
+          }
+        : undefined,
     },
     build: {
       outDir: 'dist',
