@@ -11,7 +11,7 @@ export function handleRouter(_routerList: any) {
       {
         path: '/',
         name: 'main',
-        redirect: '/index',
+        redirect: '/login',
       },
       {
         path: '/login',

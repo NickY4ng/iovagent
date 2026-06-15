@@ -19,7 +19,7 @@ const { projects } = storeToRefs(store);
 const route = useRoute();
 const router = useRouter();
 const isUserMenuOpen = ref(false);
-const currentUserName = computed(() => import.meta.env.VITE_APP_DEFAULT_LOGIN_USERNAME || '演示用户');
+const currentUserName = computed(() => localStorage.getItem('iovagent_login_user') || import.meta.env.VITE_APP_DEFAULT_LOGIN_USERNAME || '演示用户');
 
 const navs: { icon: string; id: PageId; label: string }[] = [
   { id: 'agent', label: '智能体工作台', icon: strokeIconPaths.bot },
@@ -42,6 +42,7 @@ function isNavActive(page: PageId) {
 function logout() {
   removeToken();
   localStorage.removeItem('token');
+  localStorage.removeItem('iovagent_login_user');
   isUserMenuOpen.value = false;
   router.replace('/login');
 }
