@@ -19,6 +19,11 @@ export function handleRouter(_routerList: any) {
         component: () => import('@/views/LoginAgent.vue'),
       },
       {
+        path: '/agent-ops',
+        name: 'agent-ops',
+        component: () => import('@/views/AgentOpsConfig.vue'),
+      },
+      {
         path: '/index',
         component: () => import('@/views/AgentWork/index.view.vue'),
         redirect: { name: 'agent-work-agent' },
@@ -54,6 +59,11 @@ export function handleRouter(_routerList: any) {
             path: 'projects',
             name: 'agent-work-projects',
             component: () => import('@/views/AgentWork/views/projects.view.vue'),
+          },
+          {
+            path: 'projects/new',
+            name: 'agent-work-project-create',
+            component: () => import('@/views/AgentWork/views/projectCreate.view.vue'),
           },
           {
             path: 'downloads',

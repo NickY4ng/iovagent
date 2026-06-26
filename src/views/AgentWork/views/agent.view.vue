@@ -77,7 +77,7 @@ function selectAgentModel(option: AgentModelOption) {
   isModelSelectOpen.value = false;
 }
 
-function closeModelSelectOnOutside(event: MouseEvent) {
+function closeComposerMenusOnOutside(event: MouseEvent) {
   if (!modelSelectRef.value?.contains(event.target as Node)) {
     isModelSelectOpen.value = false;
   }
@@ -86,6 +86,7 @@ function closeModelSelectOnOutside(event: MouseEvent) {
 const isOrderEventPanel = computed(() => store.visibleRightPanel === 'orderEvent');
 const isDefaultOverview = computed(() => store.visibleRightPanel === 'overview');
 const agentGridClass = computed(() => (isRightPanelVisible.value ? 'grid-cols-[minmax(0,1fr)_minmax(380px,0.96fr)]' : 'grid-cols-1'));
+const visibleQuickPrompts = computed(() => quickPrompts.slice(0, 3));
 
 const trendData = [
   { date: '05-09', count: 8 },
@@ -321,7 +322,7 @@ function clearEventPanelMap() {
 }
 
 onMounted(() => {
-  document.addEventListener('click', closeModelSelectOnOutside);
+  document.addEventListener('click', closeComposerMenusOnOutside);
   if (!import.meta.env.DEV) return;
   const { ordersSeed } = store;
   const riskOrders = getRiskOrders(ordersSeed);
@@ -343,15 +344,15 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', closeModelSelectOnOutside);
+  document.removeEventListener('click', closeComposerMenusOnOutside);
   clearEventPanelMap();
 });
 </script>
 
 <template>
-  <div class="grid h-full overflow-hidden rounded-md border border-[#deded9] bg-white" :class="agentGridClass">
-    <div class="flex h-full flex-col overflow-hidden bg-white">
-      <div class="flex h-12 items-center justify-between gap-4 border-b border-[#e2e2dc] px-4">
+  <div class="grid h-full overflow-hidden bg-[#fcfcfc]" :class="agentGridClass">
+    <div class="relative flex h-full flex-col overflow-hidden bg-[#fcfcfc]">
+      <div class="flex h-12 items-center justify-between gap-4 border-b border-[#eeeeec] bg-[#fcfcfc] px-4">
         <div class="flex items-center gap-2.5">
           <div class="flex h-7 w-7 items-center justify-center rounded-md bg-[#f2f2ef] text-slate-700">
             <Icon :svg="strokeIconPaths.msg" :size="16" />
@@ -369,7 +370,7 @@ onBeforeUnmount(() => {
           {{ isRightPanelVisible ? '隐藏右栏' : '显示右栏' }}
         </button>
       </div>
-      <div class="flex-1 space-y-4 overflow-auto bg-[#fbfbfa] p-4">
+      <div class="flex-1 space-y-4 overflow-auto bg-[#fcfcfc] p-4 pb-60">
         <div v-for="(m, i) in agentMessages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
           <div
             class="rounded-md px-4 py-3 text-sm leading-6"
@@ -406,40 +407,47 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <div class="border-t border-[#e2e2dc] bg-white p-3">
-        <div class="mb-3 flex flex-wrap items-center gap-2">
-          <span class="mr-1 text-xs font-medium text-slate-500">推荐指令</span>
-          <button
-            v-for="s in quickPrompts"
-            :key="s"
-            type="button"
-            class="rounded-md border border-[#deded9] bg-[#f7f7f5] px-3 py-1.5 text-xs text-slate-600 hover:bg-white hover:text-slate-900"
-            @click="sendAgent(s)"
+      <div class="pointer-events-none absolute right-0 bottom-4 left-0 z-20 px-5">
+        <div class="mx-auto max-w-[800px] space-y-3">
+          <div
+            class="pointer-events-auto flex h-10 items-center gap-2 overflow-hidden rounded-[18px] border border-[#deded9] bg-white px-3 shadow-[0_14px_34px_rgba(15,23,42,0.1),0_2px_8px_rgba(15,23,42,0.04)]"
           >
-            {{ s }}
-          </button>
-        </div>
-        <div class="rounded-md border border-[#deded9] bg-white px-3 py-2">
+            <div class="shrink-0 text-xs font-medium text-slate-500">推荐指令</div>
+            <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+              <button
+                v-for="s in visibleQuickPrompts"
+                :key="s"
+                type="button"
+                class="h-7 min-w-0 flex-1 rounded-full border border-[#e6e6e2] bg-[#f7f7f5] px-3 text-xs text-slate-600 transition hover:border-[#d8d8d2] hover:bg-white hover:text-slate-950"
+                @click="sendAgent(s)"
+              >
+                <span class="block truncate">{{ s }}</span>
+              </button>
+            </div>
+          </div>
+          <div
+            class="pointer-events-auto rounded-[22px] border border-[#deded9] bg-white px-4 py-3 shadow-[0_18px_46px_rgba(15,23,42,0.12),0_2px_8px_rgba(15,23,42,0.04)] transition focus-within:border-[#4c8dff] focus-within:shadow-[0_18px_46px_rgba(15,23,42,0.12),0_0_0_3px_rgba(59,130,246,0.16)]"
+          >
           <textarea
             v-model="agentInput"
-            class="min-h-[64px] w-full resize-none bg-transparent text-sm leading-7 text-slate-800 outline-none"
-            placeholder="输入查询，例如：今天有哪些异常运单"
+            class="min-h-[44px] w-full resize-none bg-transparent px-1 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
+            placeholder="发消息..."
+            rows="1"
             @keydown.enter.exact.prevent="sendAgent()"
           />
-          <div class="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2">
-            <div class="flex min-w-0 items-center gap-3">
-              <div class="shrink-0 text-xs text-slate-400">Enter 发送，Shift Enter 换行</div>
-              <div ref="modelSelectRef" class="relative">
+          <div class="mt-1 flex items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-1.5">
+              <div ref="modelSelectRef" class="relative min-w-0 shrink">
                 <button
                   type="button"
                   role="combobox"
                   aria-haspopup="listbox"
                   :aria-expanded="isModelSelectOpen"
-                  class="flex h-8 min-w-[156px] items-center justify-between gap-2 rounded-md border border-[#deded9] bg-[#f7f7f5] px-2.5 text-xs text-slate-700 transition hover:bg-white"
+                  class="flex h-8 max-w-[190px] items-center justify-between gap-2 rounded-full px-2.5 text-sm text-slate-800 transition hover:bg-[#f3f3f1]"
                   @click.stop="isModelSelectOpen = !isModelSelectOpen"
                 >
                   <span class="flex min-w-0 items-center gap-2">
-                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-slate-100" :class="selectedAgentModel.iconClass">
+                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md" :class="selectedAgentModel.iconClass">
                       <img
                         v-if="selectedAgentModel.logoUrl"
                         :src="selectedAgentModel.logoUrl"
@@ -452,7 +460,7 @@ onBeforeUnmount(() => {
                   </span>
                   <Icon :svg="strokeIconPaths.chevron" :size="13" svg-class="shrink-0 text-slate-400 rotate-90" />
                 </button>
-                <div v-if="isModelSelectOpen" class="absolute bottom-full left-0 z-30 mb-2 w-64 rounded-md border border-[#deded9] bg-white p-1 shadow-xl" role="listbox">
+                <div v-if="isModelSelectOpen" class="absolute bottom-full left-0 z-30 mb-3 w-64 rounded-2xl border border-[#deded9] bg-white p-1.5 shadow-xl" role="listbox">
                   <div class="px-2 py-1.5 text-xs font-medium text-slate-500">内置模型</div>
                   <button
                     v-for="option in agentModelOptions"
@@ -460,7 +468,7 @@ onBeforeUnmount(() => {
                     type="button"
                     role="option"
                     :aria-selected="selectedAgentModel.value === option.value"
-                    class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition hover:bg-[#f7f7f5]"
+                    class="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-[#f7f7f5]"
                     :class="selectedAgentModel.value === option.value ? 'text-slate-900' : 'text-slate-600'"
                     @click="selectAgentModel(option)"
                   >
@@ -474,14 +482,22 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             </div>
-            <button type="button" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" @click="sendAgent()">发送</button>
+            <button
+              type="button"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm transition hover:bg-slate-800"
+              aria-label="发送"
+              @click="sendAgent()"
+            >
+              <Icon :svg="strokeIconPaths.arrowUp" :size="18" />
+            </button>
+          </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="isRightPanelVisible" class="flex h-full flex-col overflow-hidden border-l border-[#deded9] bg-[#fafaf8]">
-      <div class="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-[#e2e2dc] px-4">
+    <div v-if="isRightPanelVisible" class="flex h-full flex-col overflow-hidden border-l border-[#eeeeec] bg-white">
+      <div class="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-[#eeeeec] bg-white px-4">
         <div>
           <h2 class="text-sm font-semibold leading-5 text-slate-950">
             {{ isOrderEventPanel ? '只看皖K55821异常停车事件' : isDefaultOverview ? '今日在途情况' : '今日在途预警处理结果' }}
@@ -509,41 +525,41 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <div v-else-if="!isOrderEventPanel" class="border-b border-[#e2e2dc] px-4 py-3">
-        <div class="grid grid-cols-4 gap-2">
-          <div class="rounded-md bg-[#f7f7f5] px-3 py-2">
-            <div class="text-[11px] text-slate-500">处理预警</div>
-            <div class="mt-0.5 text-xl font-semibold text-slate-900">17</div>
+      <div v-else-if="!isOrderEventPanel" class="border-b border-[#e2e2dc] p-4">
+        <div class="grid grid-cols-4 gap-3">
+          <div class="rounded-md bg-[#f7f7f5] p-3">
+            <div class="text-xs text-slate-500">处理预警</div>
+            <div class="mt-1 text-xl font-semibold text-slate-900">17</div>
           </div>
-          <div class="rounded-md bg-[#f7f7f5] px-3 py-2">
-            <div class="text-[11px] text-slate-500">真实高风险</div>
-            <div class="mt-0.5 text-xl font-semibold text-red-600">5</div>
+          <div class="rounded-md bg-[#f7f7f5] p-3">
+            <div class="text-xs text-slate-500">真实高风险</div>
+            <div class="mt-1 text-xl font-semibold text-red-600">5</div>
           </div>
-          <div class="rounded-md bg-[#f7f7f5] px-3 py-2">
-            <div class="text-[11px] text-slate-500">合理低风险</div>
-            <div class="mt-0.5 text-xl font-semibold text-emerald-600">11</div>
+          <div class="rounded-md bg-[#f7f7f5] p-3">
+            <div class="text-xs text-slate-500">合理低风险</div>
+            <div class="mt-1 text-xl font-semibold text-emerald-600">11</div>
           </div>
-          <div class="rounded-md bg-[#f7f7f5] px-3 py-2">
-            <div class="text-[11px] text-slate-500">轨迹造假</div>
-            <div class="mt-0.5 text-xl font-semibold text-red-600">1</div>
+          <div class="rounded-md bg-[#f7f7f5] p-3">
+            <div class="text-xs text-slate-500">轨迹造假</div>
+            <div class="mt-1 text-xl font-semibold text-red-600">1</div>
           </div>
         </div>
       </div>
-      <div v-if="!isOrderEventPanel" class="border-b border-[#e2e2dc] bg-white px-4" :class="isDefaultOverview ? 'py-3' : 'py-2'">
+      <div v-if="!isOrderEventPanel" class="border-b border-[#eeeeec] bg-white px-4 py-3">
         <div class="flex rounded-md bg-[#f2f2ef] p-1 text-sm">
           <button
             v-for="[key, label] in rightPanelTabs"
             :key="key"
             type="button"
-            class="flex-1 rounded-md px-3"
-            :class="[isDefaultOverview ? 'py-2' : 'py-1.5', store.visibleRightPanel === key ? 'bg-white font-medium' : 'text-slate-500']"
+            class="flex-1 rounded-md px-3 py-2"
+            :class="store.visibleRightPanel === key ? 'bg-white font-medium' : 'text-slate-500'"
             @click="setRightPanel(key)"
           >
             {{ label }}
           </button>
         </div>
       </div>
-      <div class="flex-1 overflow-auto bg-[#f7f7f5] p-4">
+      <div class="flex-1 overflow-auto bg-white p-4">
         <div v-if="store.visibleRightPanel === 'orderEvent'" class="space-y-4">
           <div class="overflow-hidden rounded-md border border-[#deded9] bg-white">
             <div class="relative h-[260px] overflow-hidden">
@@ -690,12 +706,12 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-else-if="store.visibleRightPanel === 'risk'" class="space-y-4">
-          <div class="rounded-md border border-[#deded9] bg-white p-3">
-            <div class="mb-2 flex items-center justify-between">
+          <div class="rounded-md border border-[#deded9] bg-white p-4">
+            <div class="mb-3 flex items-center justify-between">
               <div class="text-sm font-semibold">高风险异常运单</div>
               <button type="button" class="text-xs font-medium text-slate-900" @click="goPage('risk')">进入列表</button>
             </div>
-            <div class="space-y-2 text-sm">
+            <div class="space-y-3 text-sm">
               <div v-for="o in highRiskWarningResults" :key="o.id" class="w-full rounded-md border border-red-100 bg-white p-3 text-left">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">

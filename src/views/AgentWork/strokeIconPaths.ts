@@ -19,4 +19,5 @@ export const strokeIconPaths = {
   zap: 'M13 2 3 14h8l-1 8 10-12h-8z',
   user: 'M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
   alert: 'M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z',
+  arrowUp: 'M12 19V5m0 0-6 6m6-6 6 6',
 } as const;

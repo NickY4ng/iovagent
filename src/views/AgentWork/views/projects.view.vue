@@ -5,10 +5,12 @@ import { storeToRefs } from 'pinia';
 import { agentWorkData } from '@/pinia/agentWork';
 
 import { strokeIconPaths } from '../strokeIconPaths';
+import { useAgentWorkNav } from '../useAgentWorkNav';
 import { badgeToneClass, projectStatusTone } from '../utils';
 
 const store = agentWorkData();
 const { projects } = storeToRefs(store);
+const { goPage } = useAgentWorkNav();
 </script>
 
 <template>
@@ -23,7 +25,7 @@ const { projects } = storeToRefs(store);
             <h1 class="text-sm font-semibold leading-5 text-slate-950">项目管理</h1>
           </div>
         </div>
-        <button type="button" class="rounded-md bg-slate-900 px-4 py-2 text-sm text-white" @click="store.openAddProjectModal()">
+        <button type="button" class="rounded-md bg-slate-900 px-4 py-2 text-sm text-white" @click="goPage('projectCreate')">
           <Icon :svg="strokeIconPaths.plus" :size="15" svg-class="mr-1 inline" /> 新建项目
         </button>
       </div>

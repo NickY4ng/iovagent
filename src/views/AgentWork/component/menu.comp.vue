@@ -19,6 +19,7 @@ const { projects } = storeToRefs(store);
 const route = useRoute();
 const router = useRouter();
 const isUserMenuOpen = ref(false);
+const isProjectCreateActive = computed(() => route.name === agentWorkRouteName.projectCreate);
 const currentUserName = computed(() => localStorage.getItem('iovagent_login_user') || import.meta.env.VITE_APP_DEFAULT_LOGIN_USERNAME || '演示用户');
 
 const navs: { icon: string; id: PageId; label: string }[] = [
@@ -32,10 +33,16 @@ const navs: { icon: string; id: PageId; label: string }[] = [
 ];
 
 function goNav(page: PageId) {
+  if (page === 'projectCreate') {
+    if (isProjectCreateActive.value) return;
+    router.push({ name: agentWorkRouteName[page], query: { from: route.fullPath } });
+    return;
+  }
   router.push({ name: agentWorkRouteName[page] });
 }
 
 function isNavActive(page: PageId) {
+  if (page === 'projects' && route.name === agentWorkRouteName.projectCreate) return true;
   return route.name === agentWorkRouteName[page];
 }
 
@@ -49,8 +56,8 @@ function logout() {
 </script>
 
 <template>
-  <aside class="flex h-full flex-col overflow-y-hidden border-r border-[#deded9] bg-[#f5f5f3]">
-    <div class="border-b border-[#deded9] bg-[#f7f7f5] px-4 py-3">
+  <aside class="flex h-full flex-col overflow-y-hidden border-r border-[#e9e9e7] bg-[#f7f7f6]">
+    <div class="border-b border-[#e9e9e7] bg-[#f7f7f6] px-4 py-3">
       <div class="flex items-center gap-2.5">
         <div class="flex h-8 w-8 items-center justify-center rounded-md border border-[#deded9] bg-white text-slate-700">
           <Icon :svg="strokeIconPaths.truck" :size="18" />
@@ -73,8 +80,8 @@ function logout() {
     <div class="p-3">
       <button
         type="button"
-        class="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        @click="store.openAddProjectModal()"
+        class="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+        @click="goNav('projectCreate')"
       >
         <Icon :svg="strokeIconPaths.plus" :size="16" /> 新建项目
       </button>
@@ -110,7 +117,7 @@ function logout() {
       </div>
     </div>
 
-    <nav class="border-t border-[#deded9] px-3 py-3">
+    <nav class="border-t border-[#e9e9e7] px-3 py-3">
       <div class="mb-2 px-1 text-xs font-medium text-slate-500">菜单</div>
       <div class="space-y-1">
         <button
@@ -126,7 +133,7 @@ function logout() {
       </div>
     </nav>
 
-    <div class="relative border-t border-[#deded9] p-3">
+    <div class="relative border-t border-[#e9e9e7] p-3">
       <div
         v-if="isUserMenuOpen"
         class="absolute right-3 bottom-full left-3 z-20 mb-2 overflow-hidden rounded-md border border-[#deded9] bg-white shadow-lg"

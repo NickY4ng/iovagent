@@ -1,6 +1,6 @@
 import type { Order, PageId } from '@/views/AgentWork/interface';
 
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { ElMessage } from 'element-plus';
 
@@ -14,14 +14,20 @@ export const agentWorkRouteName: Record<PageId, string> = {
   detail: 'agent-work-detail',
   analytics: 'agent-work-analytics',
   projects: 'agent-work-projects',
+  projectCreate: 'agent-work-project-create',
   downloads: 'agent-work-downloads',
 };
 
 export function useAgentWorkNav() {
+  const route = useRoute();
   const router = useRouter();
   const store = agentWorkData();
 
   function goPage(page: PageId) {
+    if (page === 'projectCreate') {
+      if (route.name === agentWorkRouteName.projectCreate) return Promise.resolve();
+      return router.push({ name: agentWorkRouteName[page], query: { from: route.fullPath } });
+    }
     return router.push({ name: agentWorkRouteName[page] });
   }
 

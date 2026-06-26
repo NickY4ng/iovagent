@@ -378,6 +378,27 @@ export const agentWorkData = defineStore('agentWork', {
       this.closeAddProjectModal();
       ElMessage.success('项目创建成功');
     },
+    addSkillProject(name: string, skillNames: string[]) {
+      const projectId = `P${String(this.projects.length + 1).padStart(3, '0')}`;
+      const skillSummary = skillNames.length > 0 ? skillNames.join(' / ') : '内置技能';
+      this.projects = [
+        {
+          id: projectId,
+          name,
+          status: '已连接',
+          sync: '刚刚',
+          total: 0,
+          risk: 0,
+          tmsUrl: skillSummary,
+          tmsUser: 'skill_agent',
+          keyword: skillNames.slice(0, 2).join('、') || name,
+          statusFilter: '在途',
+        },
+        ...this.projects,
+      ];
+      this.currentProjectId = projectId;
+      ElMessage.success('项目创建成功');
+    },
     removeProjectAt(index: number) {
       this.projects = this.projects.filter((_, idx) => idx !== index);
       if (!this.projects.find((p) => p.id === this.currentProjectId)) {
