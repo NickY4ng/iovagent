@@ -9,6 +9,7 @@ export interface Project {
   tmsUser: string;
   keyword: string;
   statusFilter: string;
+  skillIds?: string[];
 }
 export type PageId = 'agent' | 'analytics' | 'detail' | 'downloads' | 'orders' | 'projectCreate' | 'projects' | 'risk';
 export type Tone = 'blue' | 'gray' | 'green' | 'orange' | 'purple' | 'red';

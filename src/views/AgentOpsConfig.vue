@@ -40,6 +40,7 @@ const router = useRouter();
 const activeTab = ref<ConfigTab>('employees');
 const isCreateEmployeeModalOpen = ref(false);
 const isValidationModalOpen = ref(false);
+const editingEmployeeId = ref('');
 const validatingEmployee = ref<DataEmployee | null>(null);
 const loginTypes: LoginType[] = ['无验证', '图形验证码', '短信验证码', '手机扫码'];
 const newEmployeeForm = reactive({
@@ -223,6 +224,9 @@ const waybillFields: WaybillField[] = [
 
 const selectedEmployee = computed(() => dataEmployees.value.find((employee) => employee.id === selectedEmployeeId.value) ?? dataEmployees.value[0]!);
 const currentValidationLoginType = computed(() => validatingEmployee.value?.loginType ?? '无验证');
+const isEditingEmployee = computed(() => editingEmployeeId.value.length > 0);
+const employeeFormTitle = computed(() => (isEditingEmployee.value ? '编辑数据员工（TMS）' : '增加数据员工（TMS）'));
+const employeeFormConfirmText = computed(() => (isEditingEmployee.value ? '保存' : '确认'));
 
 function bumpVersion(version: string) {
   const versionNumber = Number(version.replace('v', ''));
@@ -271,6 +275,7 @@ function sendSmsCode() {
 }
 
 function resetNewEmployeeForm() {
+  editingEmployeeId.value = '';
   newEmployeeForm.name = '';
   newEmployeeForm.description = '';
   newEmployeeForm.loginUrl = '';
@@ -281,6 +286,18 @@ function resetNewEmployeeForm() {
 
 function openCreateEmployeeModal() {
   resetNewEmployeeForm();
+  isCreateEmployeeModalOpen.value = true;
+}
+
+function openEditEmployeeModal(employee: DataEmployee) {
+  showSkill(employee);
+  editingEmployeeId.value = employee.id;
+  newEmployeeForm.name = employee.name;
+  newEmployeeForm.description = employee.description;
+  newEmployeeForm.loginUrl = employee.loginUrl;
+  newEmployeeForm.loginType = employee.loginType;
+  newEmployeeForm.skillContent = employee.skillContent;
+  newEmployeeForm.skillFileName = employee.skillFileName;
   isCreateEmployeeModalOpen.value = true;
 }
 
@@ -316,6 +333,35 @@ function confirmCreateEmployee() {
   }
   if (!newEmployeeForm.skillFileName || !newEmployeeForm.skillContent) {
     ElMessage.warning('请上传数据获取映射 skill 文件');
+    return;
+  }
+
+  if (isEditingEmployee.value) {
+    const employee = dataEmployees.value.find((item) => item.id === editingEmployeeId.value);
+    if (!employee) {
+      ElMessage.warning('未找到需要编辑的数据员工');
+      return;
+    }
+    const isSkillChanged = newEmployeeForm.skillFileName !== employee.skillFileName || newEmployeeForm.skillContent !== employee.skillContent;
+    dataEmployees.value = dataEmployees.value.map((item) =>
+      item.id === employee.id
+        ? {
+            ...item,
+            name,
+            description,
+            loginUrl,
+            loginType: newEmployeeForm.loginType,
+            skillContent: newEmployeeForm.skillContent,
+            skillFileName: newEmployeeForm.skillFileName,
+            skillUpdated: isSkillChanged ? '刚刚' : item.skillUpdated,
+            skillVersion: isSkillChanged ? bumpVersion(item.skillVersion) : item.skillVersion,
+          }
+        : item,
+    );
+    selectedEmployeeId.value = employee.id;
+    isCreateEmployeeModalOpen.value = false;
+    resetNewEmployeeForm();
+    ElMessage.success('数据员工已保存');
     return;
   }
 
@@ -487,7 +533,7 @@ async function uploadSkill(employee: DataEmployee, event: Event) {
                   <th class="px-4 py-3">数据员工名称</th>
                   <th class="px-4 py-3">登录地址</th>
                   <th class="w-[130px] px-4 py-3">登录方式</th>
-                  <th class="w-[170px] px-4 py-3">数据映射 Skill</th>
+                  <th class="w-[230px] px-4 py-3">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-[#ededea]">
@@ -514,6 +560,9 @@ async function uploadSkill(employee: DataEmployee, event: Event) {
                   </td>
                   <td class="px-4 py-4 align-middle">
                     <div class="flex flex-wrap items-center gap-2">
+                      <button type="button" class="rounded-md border border-[#deded9] px-2 py-1 text-xs hover:bg-white" @click.stop="openEditEmployeeModal(employee)">
+                        编辑
+                      </button>
                       <button type="button" class="rounded-md border border-[#deded9] px-2 py-1 text-xs hover:bg-white" @click.stop="openValidationModal(employee)">
                         验证数据员工
                       </button>
@@ -726,7 +775,7 @@ async function uploadSkill(employee: DataEmployee, event: Event) {
             <div class="flex h-7 w-7 items-center justify-center rounded-md bg-[#f2f2ef] text-slate-700">
               <Icon :svg="strokeIconPaths.bot" :size="16" />
             </div>
-            <h2 class="text-sm font-semibold leading-5 text-slate-950">增加数据员工（TMS）</h2>
+            <h2 class="text-sm font-semibold leading-5 text-slate-950">{{ employeeFormTitle }}</h2>
           </div>
           <button type="button" class="rounded-md p-1 text-slate-400 hover:bg-[#f7f7f5] hover:text-slate-700" @click="closeCreateEmployeeModal">
             <Icon :svg="strokeIconPaths.x" :size="16" />
@@ -791,7 +840,7 @@ async function uploadSkill(employee: DataEmployee, event: Event) {
             取消
           </button>
           <button type="button" class="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800" @click="confirmCreateEmployee">
-            确认
+            {{ employeeFormConfirmText }}
           </button>
         </div>
       </div>

@@ -27,6 +27,7 @@ const projectsSeed: Project[] = [
     tmsUser: 'alfred',
     keyword: '华东干线',
     statusFilter: '在途',
+    skillIds: ['jinyu-cement-tms', 'route-risk-expert', 'gps-trace-expert', 'parking-event-expert'],
   },
   {
     id: 'P002',
@@ -39,6 +40,7 @@ const projectsSeed: Project[] = [
     tmsUser: 'cold_ops',
     keyword: '冷链',
     statusFilter: '全部',
+    skillIds: ['spreadsheet-waybill', 'route-risk-expert', 'parking-event-expert', 'delivery-sla-expert'],
   },
   {
     id: 'P003',
@@ -51,6 +53,7 @@ const projectsSeed: Project[] = [
     tmsUser: 'sw_factory',
     keyword: '西南工厂',
     statusFilter: '装货中',
+    skillIds: ['zhilian-shunda-tms', 'route-risk-expert', 'gps-trace-expert'],
   },
   {
     id: 'P004',
@@ -63,6 +66,7 @@ const projectsSeed: Project[] = [
     tmsUser: 'sw_factory',
     keyword: '西南工厂',
     statusFilter: '在途',
+    skillIds: ['jinmailang-logistics', 'route-risk-expert', 'parking-event-expert'],
   },
   {
     id: 'P005',
@@ -75,6 +79,7 @@ const projectsSeed: Project[] = [
     tmsUser: 'sw_factory',
     keyword: '西南工厂',
     statusFilter: '已到货',
+    skillIds: ['tms-sync-employee', 'route-risk-expert', 'delivery-sla-expert'],
   },
 ];
 
@@ -372,13 +377,14 @@ export const agentWorkData = defineStore('agentWork', {
           tmsUser: 'demo_user',
           keyword: '演示',
           statusFilter: '在途',
+          skillIds: ['spreadsheet-waybill', 'route-risk-expert', 'gps-trace-expert', 'parking-event-expert'],
         },
         ...this.projects,
       ];
       this.closeAddProjectModal();
       ElMessage.success('项目创建成功');
     },
-    addSkillProject(name: string, skillNames: string[]) {
+    addSkillProject(name: string, skillNames: string[], skillIds: string[]) {
       const projectId = `P${String(this.projects.length + 1).padStart(3, '0')}`;
       const skillSummary = skillNames.length > 0 ? skillNames.join(' / ') : '内置技能';
       this.projects = [
@@ -393,11 +399,29 @@ export const agentWorkData = defineStore('agentWork', {
           tmsUser: 'skill_agent',
           keyword: skillNames.slice(0, 2).join('、') || name,
           statusFilter: '在途',
+          skillIds,
         },
         ...this.projects,
       ];
       this.currentProjectId = projectId;
       ElMessage.success('项目创建成功');
+    },
+    updateSkillProject(projectId: string, name: string, skillNames: string[], skillIds: string[]) {
+      const skillSummary = skillNames.length > 0 ? skillNames.join(' / ') : '内置技能';
+      this.projects = this.projects.map((project) =>
+        project.id === projectId
+          ? {
+              ...project,
+              name,
+              tmsUrl: skillSummary,
+              tmsUser: project.tmsUser || 'skill_agent',
+              keyword: skillNames.slice(0, 2).join('、') || name,
+              skillIds,
+            }
+          : project,
+      );
+      this.currentProjectId = projectId;
+      ElMessage.success('项目已更新');
     },
     removeProjectAt(index: number) {
       this.projects = this.projects.filter((_, idx) => idx !== index);

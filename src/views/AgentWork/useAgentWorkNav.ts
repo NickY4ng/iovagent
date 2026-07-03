@@ -23,10 +23,10 @@ export function useAgentWorkNav() {
   const router = useRouter();
   const store = agentWorkData();
 
-  function goPage(page: PageId) {
+  function goPage(page: PageId, query: Record<string, string> = {}) {
     if (page === 'projectCreate') {
       if (route.name === agentWorkRouteName.projectCreate) return Promise.resolve();
-      return router.push({ name: agentWorkRouteName[page], query: { from: route.fullPath } });
+      return router.push({ name: agentWorkRouteName[page], query: { from: route.fullPath, ...query } });
     }
     return router.push({ name: agentWorkRouteName[page] });
   }

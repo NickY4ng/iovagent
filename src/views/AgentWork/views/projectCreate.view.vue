@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { Icon } from '@packages/icon';
@@ -9,6 +9,7 @@ import { agentWorkData } from '@/pinia/agentWork';
 
 import { strokeIconPaths } from '../strokeIconPaths';
 import { useAgentWorkNav } from '../useAgentWorkNav';
+import { badgeToneClass, projectStatusTone } from '../utils';
 
 type SkillType = 'data' | 'logistics';
 type SkillTab = 'all' | SkillType;
@@ -35,10 +36,11 @@ const { goPage } = useAgentWorkNav();
 const route = useRoute();
 const router = useRouter();
 const maxProjectNameLength = 20;
+const defaultLogisticsSkillIds = ['route-risk-expert', 'gps-trace-expert', 'parking-event-expert'];
 const projectName = ref('');
 const activeTab = ref<SkillTab>('all');
 const selectedDataSkillId = ref('');
-const selectedLogisticsSkillIds = ref<string[]>(['route-risk-expert', 'gps-trace-expert', 'parking-event-expert']);
+const selectedLogisticsSkillIds = ref<string[]>([...defaultLogisticsSkillIds]);
 const authorizedSkillIds = ref<string[]>([]);
 const pendingLoginSkill = ref<ProjectSkill | null>(null);
 const loginAgentStatus = ref<LoginAgentStatus>('idle');
@@ -144,6 +146,13 @@ const filteredSkills = computed(() => (activeTab.value === 'all' ? skills : skil
 const selectedSkills = computed(() =>
   skills.filter((skill) => skill.id === selectedDataSkillId.value || selectedLogisticsSkillIds.value.includes(skill.id)),
 );
+const editingProjectId = computed(() => {
+  const projectId = Array.isArray(route.query.projectId) ? route.query.projectId[0] : route.query.projectId;
+  return typeof projectId === 'string' ? projectId : '';
+});
+const editingProject = computed(() => store.projects.find((project) => project.id === editingProjectId.value));
+const isEditMode = computed(() => Boolean(editingProject.value));
+const pageTitle = computed(() => (isEditMode.value ? '编辑项目' : '新建项目'));
 const canGoNext = computed(() => projectName.value.trim().length > 0 && selectedSkills.value.length > 0);
 const loginConfirmText = computed(() => {
   if (loginAgentStatus.value === 'complete') return '完成';
@@ -152,6 +161,36 @@ const loginConfirmText = computed(() => {
   return '确认';
 });
 const isLoginFormLocked = computed(() => loginAgentStatus.value !== 'idle');
+
+function getProjectSkillIds() {
+  const project = editingProject.value;
+  if (!project) return [];
+  if (project.skillIds?.length) return project.skillIds;
+  return skills.filter((skill) => project.tmsUrl.includes(skill.name)).map((skill) => skill.id);
+}
+
+function initializeProjectForm() {
+  const project = editingProject.value;
+  if (!project && editingProjectId.value) {
+    ElMessage.warning('未找到需要编辑的项目');
+    goPage('projects');
+    return;
+  }
+  if (!project) {
+    projectName.value = '';
+    selectedDataSkillId.value = '';
+    selectedLogisticsSkillIds.value = [...defaultLogisticsSkillIds];
+    authorizedSkillIds.value = [];
+    return;
+  }
+
+  const projectSkillIds = getProjectSkillIds();
+  const dataSkill = skills.find((skill) => projectSkillIds.includes(skill.id) && skill.type === 'data');
+  projectName.value = project.name;
+  selectedDataSkillId.value = dataSkill?.id ?? '';
+  selectedLogisticsSkillIds.value = projectSkillIds.filter((id) => skills.some((skill) => skill.id === id && skill.type === 'logistics'));
+  authorizedSkillIds.value = dataSkill?.requiresLogin ? [dataSkill.id] : [];
+}
 
 function handleProjectNameInput(event: Event) {
   const input = event.target as HTMLInputElement;
@@ -312,12 +351,19 @@ function goNext() {
     ElMessage.warning('请选择至少一项项目技能');
     return;
   }
-  store.addSkillProject(
-    cleanName,
-    selectedSkills.value.map((skill) => skill.name),
-  );
+  const skillNames = selectedSkills.value.map((skill) => skill.name);
+  const skillIds = selectedSkills.value.map((skill) => skill.id);
+  if (editingProject.value) {
+    store.updateSkillProject(editingProject.value.id, cleanName, skillNames, skillIds);
+  } else {
+    store.addSkillProject(cleanName, skillNames, skillIds);
+  }
   goPage('projects');
 }
+
+onMounted(() => {
+  initializeProjectForm();
+});
 
 onBeforeUnmount(() => {
   clearLoginAgentTimers();
@@ -331,7 +377,7 @@ onBeforeUnmount(() => {
         <div class="flex h-7 w-7 items-center justify-center rounded-md bg-[#f2f2ef] text-slate-700">
           <Icon :svg="strokeIconPaths.plus" :size="16" />
         </div>
-        <h1 class="text-sm font-semibold leading-5 text-slate-950">新建项目</h1>
+        <h1 class="text-sm font-semibold leading-5 text-slate-950">{{ pageTitle }}</h1>
       </div>
       <button type="button" class="rounded-md border border-[#deded9] px-3 py-1.5 text-xs text-slate-600 hover:bg-[#f7f7f5]" @click="cancelCreate">
         取消
@@ -351,6 +397,26 @@ onBeforeUnmount(() => {
         <span class="ml-3 text-xs" :class="projectNameLength >= maxProjectNameLength ? 'text-amber-600' : 'text-slate-400'">
           {{ projectNameLength }}/{{ maxProjectNameLength }}
         </span>
+      </div>
+      <div v-if="editingProject" class="mt-3 grid grid-cols-4 gap-2 rounded-md border border-[#deded9] bg-[#fbfbfa] p-2">
+        <div class="rounded-md bg-white px-3 py-2">
+          <div class="text-[11px] leading-4 text-slate-500">当前连接状态</div>
+          <span class="mt-1 inline-flex rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass(projectStatusTone(editingProject.status))">
+            {{ editingProject.status }}
+          </span>
+        </div>
+        <div class="rounded-md bg-white px-3 py-2">
+          <div class="text-[11px] leading-4 text-slate-500">最近同步</div>
+          <div class="mt-1 truncate text-sm font-medium text-slate-900">{{ editingProject.sync }}</div>
+        </div>
+        <div class="rounded-md bg-white px-3 py-2">
+          <div class="text-[11px] leading-4 text-slate-500">历史数据</div>
+          <div class="mt-1 truncate text-sm font-medium text-slate-900">{{ editingProject.total }} 单 · {{ editingProject.risk }} 异常</div>
+        </div>
+        <div class="rounded-md bg-white px-3 py-2">
+          <div class="text-[11px] leading-4 text-slate-500">筛选条件</div>
+          <div class="mt-1 truncate text-sm font-medium text-slate-900">{{ editingProject.keyword || '无关键词' }} · {{ editingProject.statusFilter }}</div>
+        </div>
       </div>
     </div>
 
@@ -441,7 +507,7 @@ onBeforeUnmount(() => {
           :disabled="!canGoNext"
           @click="goNext"
         >
-          下一步
+          完成
         </button>
       </div>
     </section>
