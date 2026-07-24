@@ -9,6 +9,7 @@ import { agentWorkData } from '@/pinia/agentWork';
 /** 与 `router/index` 中子路由 `name` 一致 */
 export const agentWorkRouteName: Record<PageId, string> = {
   agent: 'agent-work-agent',
+  longTasks: 'agent-work-long-tasks',
   orders: 'agent-work-orders',
   risk: 'agent-work-risk',
   detail: 'agent-work-detail',

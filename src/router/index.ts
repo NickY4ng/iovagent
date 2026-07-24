@@ -34,6 +34,11 @@ export function handleRouter(_routerList: any) {
             component: () => import('@/views/AgentWork/views/agent.view.vue'),
           },
           {
+            path: 'tasks',
+            name: 'agent-work-long-tasks',
+            component: () => import('@/views/AgentWork/views/longTasks.view.vue'),
+          },
+          {
             path: 'orders',
             name: 'agent-work-orders',
             component: () => import('@/views/AgentWork/views/orderList.view.vue'),

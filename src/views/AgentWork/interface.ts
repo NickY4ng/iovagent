@@ -11,7 +11,7 @@ export interface Project {
   statusFilter: string;
   skillIds?: string[];
 }
-export type PageId = 'agent' | 'analytics' | 'detail' | 'downloads' | 'orders' | 'projectCreate' | 'projects' | 'risk';
+export type PageId = 'agent' | 'analytics' | 'detail' | 'downloads' | 'longTasks' | 'orders' | 'projectCreate' | 'projects' | 'risk';
 export type Tone = 'blue' | 'gray' | 'green' | 'orange' | 'purple' | 'red';
 
 export interface Order {

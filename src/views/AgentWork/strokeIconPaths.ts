@@ -1,4 +1,6 @@
 export const strokeIconPaths = {
+  alarmClock:
+    'M12 6a8 8 0 1 0 0 16 8 8 0 0 0 0-16ZM12 10v4l3 2M5 3 2 6M19 3l3 3M10 2h4',
   bot: 'M12 8V4m-4 4h8a4 4 0 0 1 4 4v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-5a4 4 0 0 1 4-4Zm-1 5H8m8 0h-3',
   check: 'M20 6 9 17l-5-5',
   chevron: 'M9 18l6-6-6-6',
