@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { TimelineEvent } from '../interface';
+import type { ChatMessage, TimelineEvent } from '../interface';
 import type { LatLngExpression, LatLngTuple } from 'leaflet';
 
 import L from 'leaflet';
@@ -18,6 +18,7 @@ import { useAgentWorkNav } from '../useAgentWorkNav';
 const store = agentWorkData();
 const { agentMessages, agentInput } = storeToRefs(store);
 const { goPage, createDownload, sendAgent } = useAgentWorkNav();
+const agentMessageListRef = ref<HTMLDivElement | null>(null);
 const panelMapRef = ref<HTMLDivElement | null>(null);
 const panelRouteDistance = ref('约 175 km');
 const panelRouteDuration = ref('约 2h 40m');
@@ -66,7 +67,11 @@ const agentModelOptions: AgentModelOption[] = [
 const selectedAgentModel = ref(agentModelOptions[0]!);
 const isModelSelectOpen = ref(false);
 const modelSelectRef = ref<HTMLDivElement | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const uploadedFiles = ref<File[]>([]);
+const isFileDragActive = ref(false);
 const isRightPanelVisible = ref(true);
+let fileDragDepth = 0;
 
 function setRightPanel(key: string) {
   store.rightPanel = key;
@@ -81,6 +86,81 @@ function closeComposerMenusOnOutside(event: MouseEvent) {
   if (!modelSelectRef.value?.contains(event.target as Node)) {
     isModelSelectOpen.value = false;
   }
+}
+
+function addUploadedFiles(files: File[]) {
+  const existingKeys = new Set(uploadedFiles.value.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
+  const newFiles = files.filter((file) => {
+    const key = `${file.name}-${file.size}-${file.lastModified}`;
+    if (existingKeys.has(key)) return false;
+    existingKeys.add(key);
+    return true;
+  });
+  uploadedFiles.value = [...uploadedFiles.value, ...newFiles];
+}
+
+function openFilePicker() {
+  fileInputRef.value?.click();
+}
+
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  addUploadedFiles(Array.from(input.files ?? []));
+  input.value = '';
+}
+
+function removeUploadedFile(index: number) {
+  uploadedFiles.value = uploadedFiles.value.filter((_, fileIndex) => fileIndex !== index);
+}
+
+function handleComposerDragEnter() {
+  fileDragDepth += 1;
+  isFileDragActive.value = true;
+}
+
+function handleComposerDragLeave() {
+  fileDragDepth = Math.max(0, fileDragDepth - 1);
+  if (fileDragDepth === 0) isFileDragActive.value = false;
+}
+
+function handleComposerDrop(event: DragEvent) {
+  fileDragDepth = 0;
+  isFileDragActive.value = false;
+  addUploadedFiles(Array.from(event.dataTransfer?.files ?? []));
+}
+
+function sendComposerMessage() {
+  const text = agentInput.value.trim();
+  if (!text && uploadedFiles.value.length === 0) return;
+
+  if (uploadedFiles.value.length > 0) {
+    const attachmentText = `附件：${uploadedFiles.value.map((file) => file.name).join('、')}`;
+    sendAgent(text ? `${text}\n${attachmentText}` : attachmentText);
+    uploadedFiles.value = [];
+    agentInput.value = '';
+    return;
+  }
+
+  sendAgent();
+}
+
+function formatStepNumber(index: number) {
+  return String(index + 1).padStart(2, '0');
+}
+
+function progressStepState(message: ChatMessage, stepIndex: number) {
+  if (!message.progressMode) return 'complete';
+  const activeStepIndex = message.activeStepIndex ?? 0;
+  if (message.status === '已完成' || stepIndex < activeStepIndex) return 'complete';
+  if (stepIndex === activeStepIndex) return 'running';
+  return 'pending';
+}
+
+function scrollAgentMessagesToBottom() {
+  nextTick(() => {
+    if (!agentMessageListRef.value) return;
+    agentMessageListRef.value.scrollTop = agentMessageListRef.value.scrollHeight;
+  });
 }
 
 const isOrderEventPanel = computed(() => store.visibleRightPanel === 'orderEvent');
@@ -332,6 +412,14 @@ onMounted(() => {
 });
 
 watch(
+  agentMessages,
+  () => {
+    scrollAgentMessagesToBottom();
+  },
+  { deep: true },
+);
+
+watch(
   () => store.visibleRightPanel,
   (panel) => {
     if (panel === 'orderEvent') {
@@ -370,7 +458,7 @@ onBeforeUnmount(() => {
           {{ isRightPanelVisible ? '隐藏右栏' : '显示右栏' }}
         </button>
       </div>
-      <div class="flex-1 space-y-4 overflow-auto bg-[#fcfcfc] p-4 pb-60">
+      <div ref="agentMessageListRef" class="flex-1 space-y-4 overflow-auto bg-[#fcfcfc] p-4 pb-60">
         <div v-for="(m, i) in agentMessages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
           <div
             class="rounded-md px-4 py-3 text-sm leading-6"
@@ -384,25 +472,75 @@ onBeforeUnmount(() => {
                 <div>
                   <div class="text-sm font-semibold text-slate-900">{{ m.title }}</div>
                 </div>
-                <span class="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ m.status }}</span>
+                <span
+                  class="shrink-0 rounded-md border px-2 py-0.5 text-xs font-medium"
+                  :class="
+                    m.status === '已完成'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-blue-200 bg-blue-50 text-blue-700'
+                  "
+                >
+                  {{ m.status }}
+                </span>
               </div>
               <div v-if="m.text" class="mb-3 rounded-md bg-[#f7f7f5] px-3 py-2 text-xs leading-5 text-slate-500">
                 {{ m.text }}
               </div>
               <div v-if="m.steps?.length" class="divide-y divide-[#ededea] rounded-md border border-[#deded9] bg-white">
-                <div v-for="(step, stepIndex) in m.steps" :key="step.title" class="grid grid-cols-[82px_1fr] gap-2 px-3 py-1.5">
-                  <div class="text-[11px] font-semibold leading-5 text-slate-900">0{{ stepIndex + 1 }} · {{ step.title }}</div>
-                  <div class="min-w-0 text-xs leading-5 text-slate-500">
-                    {{ step.text }}
+                <template v-for="(step, stepIndex) in m.steps" :key="step.title">
+                  <div
+                    v-if="!m.progressMode || progressStepState(m, stepIndex) !== 'pending'"
+                    class="grid gap-3 px-3"
+                    :class="m.progressMode ? 'grid-cols-[132px_1fr] py-2.5' : 'grid-cols-[82px_1fr] py-1.5'"
+                  >
+                    <div class="flex min-w-0 items-start gap-2 text-[11px] font-semibold leading-5 text-slate-900">
+                      <span
+                        v-if="m.progressMode"
+                        class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600"
+                      >
+                        <Icon
+                          v-if="progressStepState(m, stepIndex) === 'running'"
+                          :svg="strokeIconPaths.refresh"
+                          :size="11"
+                          svg-class="animate-spin"
+                        />
+                        <Icon v-else :svg="strokeIconPaths.check" :size="11" />
+                      </span>
+                      <span>
+                        {{ formatStepNumber(stepIndex) }} · {{ step.title }}
+                      </span>
+                    </div>
+                    <div class="min-w-0 text-xs leading-5 text-slate-500">
+                      <div class="text-slate-600">{{ step.text }}</div>
+                      <div v-if="step.skill" class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span class="rounded-md bg-[#f1f1ef] px-2 py-0.5 text-[11px] font-medium text-slate-700">调用技能：{{ step.skill }}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </template>
               </div>
               <div v-if="m.result" class="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-medium leading-5 text-blue-700">
                 {{ m.result }}
               </div>
+              <a
+                v-if="m.file"
+                class="mt-3 flex w-full items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100/70"
+                :download="m.file.name"
+                :href="m.file.url"
+                :aria-label="`下载 ${m.file.name}`"
+              >
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-emerald-700 shadow-sm">
+                  <Icon :svg="strokeIconPaths.fileSpreadsheet" :size="18" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-slate-900">{{ m.file.name }}</span>
+                  <span class="mt-0.5 block text-xs text-slate-500">Excel 工作簿 · 已完成补全与复检</span>
+                </span>
+                <Icon :svg="strokeIconPaths.download" :size="17" svg-class="shrink-0 text-emerald-700" />
+              </a>
             </template>
             <template v-else>
-              {{ m.text }}
+              <span class="whitespace-pre-line">{{ m.text }}</span>
             </template>
           </div>
         </div>
@@ -426,71 +564,110 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div
-            class="pointer-events-auto rounded-[22px] border border-[#deded9] bg-white px-4 py-3 shadow-[0_18px_46px_rgba(15,23,42,0.12),0_2px_8px_rgba(15,23,42,0.04)] transition focus-within:border-[#4c8dff] focus-within:shadow-[0_18px_46px_rgba(15,23,42,0.12),0_0_0_3px_rgba(59,130,246,0.16)]"
+            class="pointer-events-auto relative rounded-[22px] border bg-white px-4 py-3 shadow-[0_18px_46px_rgba(15,23,42,0.12),0_2px_8px_rgba(15,23,42,0.04)] transition focus-within:border-[#4c8dff] focus-within:shadow-[0_18px_46px_rgba(15,23,42,0.12),0_0_0_3px_rgba(59,130,246,0.16)]"
+            :class="isFileDragActive ? 'border-[#4c8dff] bg-blue-50/70 shadow-[0_18px_46px_rgba(15,23,42,0.12),0_0_0_3px_rgba(59,130,246,0.16)]' : 'border-[#deded9]'"
+            @dragenter.prevent.stop="handleComposerDragEnter"
+            @dragover.prevent.stop
+            @dragleave.prevent.stop="handleComposerDragLeave"
+            @drop.prevent.stop="handleComposerDrop"
           >
-          <textarea
-            v-model="agentInput"
-            class="min-h-[44px] w-full resize-none bg-transparent px-1 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
-            placeholder="发消息..."
-            rows="1"
-            @keydown.enter.exact.prevent="sendAgent()"
-          />
-          <div class="mt-1 flex items-center justify-between gap-3">
-            <div class="flex min-w-0 items-center gap-1.5">
-              <div ref="modelSelectRef" class="relative min-w-0 shrink">
+            <div
+              v-if="isFileDragActive"
+              class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[21px] bg-blue-50/95 text-sm font-medium text-blue-700"
+            >
+              松开以上传文件
+            </div>
+            <div v-if="uploadedFiles.length" class="mb-2 flex flex-wrap gap-2 px-1 pt-1">
+              <div
+                v-for="(file, index) in uploadedFiles"
+                :key="`${file.name}-${file.size}-${file.lastModified}`"
+                class="relative flex h-8 max-w-[240px] items-center gap-1.5 rounded-md border border-[#e1e1dd] bg-[#f7f7f5] px-2.5 pr-4 text-xs text-slate-600"
+              >
+                <Icon :svg="strokeIconPaths.file" :size="14" svg-class="shrink-0 text-slate-500" />
+                <span class="truncate">{{ file.name }}</span>
                 <button
                   type="button"
-                  role="combobox"
-                  aria-haspopup="listbox"
-                  :aria-expanded="isModelSelectOpen"
-                  class="flex h-8 max-w-[190px] items-center justify-between gap-2 rounded-full px-2.5 text-sm text-slate-800 transition hover:bg-[#f3f3f1]"
-                  @click.stop="isModelSelectOpen = !isModelSelectOpen"
+                  class="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-white shadow-sm transition hover:bg-slate-900"
+                  :aria-label="`删除文件 ${file.name}`"
+                  @click="removeUploadedFile(index)"
                 >
-                  <span class="flex min-w-0 items-center gap-2">
-                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md" :class="selectedAgentModel.iconClass">
-                      <img
-                        v-if="selectedAgentModel.logoUrl"
-                        :src="selectedAgentModel.logoUrl"
-                        :alt="`${selectedAgentModel.label} logo`"
-                        class="h-4 w-4 object-contain"
-                      />
-                      <Icon v-else :svg="selectedAgentModel.icon" :size="13" />
-                    </span>
-                    <span class="truncate">{{ selectedAgentModel.label }}</span>
-                  </span>
-                  <Icon :svg="strokeIconPaths.chevron" :size="13" svg-class="shrink-0 text-slate-400 rotate-90" />
+                  <Icon :svg="strokeIconPaths.x" :size="9" />
                 </button>
-                <div v-if="isModelSelectOpen" class="absolute bottom-full left-0 z-30 mb-3 w-64 rounded-2xl border border-[#deded9] bg-white p-1.5 shadow-xl" role="listbox">
-                  <div class="px-2 py-1.5 text-xs font-medium text-slate-500">内置模型</div>
-                  <button
-                    v-for="option in agentModelOptions"
-                    :key="option.value"
-                    type="button"
-                    role="option"
-                    :aria-selected="selectedAgentModel.value === option.value"
-                    class="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-[#f7f7f5]"
-                    :class="selectedAgentModel.value === option.value ? 'text-slate-900' : 'text-slate-600'"
-                    @click="selectAgentModel(option)"
-                  >
-                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" :class="option.iconClass">
-                      <img v-if="option.logoUrl" :src="option.logoUrl" :alt="`${option.label} logo`" class="h-5 w-5 object-contain" />
-                      <Icon v-else :svg="option.icon" :size="15" />
-                    </span>
-                    <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
-                    <Icon v-if="selectedAgentModel.value === option.value" :svg="strokeIconPaths.check" :size="15" svg-class="text-slate-900" />
-                  </button>
-                </div>
               </div>
             </div>
-            <button
-              type="button"
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm transition hover:bg-slate-800"
-              aria-label="发送"
-              @click="sendAgent()"
-            >
-              <Icon :svg="strokeIconPaths.arrowUp" :size="18" />
-            </button>
-          </div>
+            <textarea
+              v-model="agentInput"
+              class="min-h-[44px] w-full resize-none bg-transparent px-1 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
+              placeholder="发消息..."
+              rows="1"
+              @keydown.enter.exact.prevent="sendComposerMessage"
+            />
+            <div class="mt-1 flex items-center justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-1.5">
+                <input ref="fileInputRef" type="file" class="hidden" multiple @change="handleFileSelect" />
+                <button
+                  type="button"
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-600 transition hover:bg-[#f3f3f1] hover:text-slate-900"
+                  aria-label="上传文件"
+                  title="上传文件"
+                  @click="openFilePicker"
+                >
+                  <Icon :svg="strokeIconPaths.paperclip" :size="17" />
+                </button>
+                <div ref="modelSelectRef" class="relative min-w-0 shrink">
+                  <button
+                    type="button"
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    :aria-expanded="isModelSelectOpen"
+                    class="flex h-8 max-w-[190px] items-center justify-between gap-2 rounded-full px-2.5 text-sm text-slate-800 transition hover:bg-[#f3f3f1]"
+                    @click.stop="isModelSelectOpen = !isModelSelectOpen"
+                  >
+                    <span class="flex min-w-0 items-center gap-2">
+                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md" :class="selectedAgentModel.iconClass">
+                        <img
+                          v-if="selectedAgentModel.logoUrl"
+                          :src="selectedAgentModel.logoUrl"
+                          :alt="`${selectedAgentModel.label} logo`"
+                          class="h-4 w-4 object-contain"
+                        />
+                        <Icon v-else :svg="selectedAgentModel.icon" :size="13" />
+                      </span>
+                      <span class="truncate">{{ selectedAgentModel.label }}</span>
+                    </span>
+                    <Icon :svg="strokeIconPaths.chevron" :size="13" svg-class="shrink-0 text-slate-400 rotate-90" />
+                  </button>
+                  <div v-if="isModelSelectOpen" class="absolute bottom-full left-0 z-30 mb-3 w-64 rounded-2xl border border-[#deded9] bg-white p-1.5 shadow-xl" role="listbox">
+                    <div class="px-2 py-1.5 text-xs font-medium text-slate-500">内置模型</div>
+                    <button
+                      v-for="option in agentModelOptions"
+                      :key="option.value"
+                      type="button"
+                      role="option"
+                      :aria-selected="selectedAgentModel.value === option.value"
+                      class="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-[#f7f7f5]"
+                      :class="selectedAgentModel.value === option.value ? 'text-slate-900' : 'text-slate-600'"
+                      @click="selectAgentModel(option)"
+                    >
+                      <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" :class="option.iconClass">
+                        <img v-if="option.logoUrl" :src="option.logoUrl" :alt="`${option.label} logo`" class="h-5 w-5 object-contain" />
+                        <Icon v-else :svg="option.icon" :size="15" />
+                      </span>
+                      <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
+                      <Icon v-if="selectedAgentModel.value === option.value" :svg="strokeIconPaths.check" :size="15" svg-class="text-slate-900" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm transition hover:bg-slate-800"
+                aria-label="发送"
+                @click="sendComposerMessage"
+              >
+                <Icon :svg="strokeIconPaths.arrowUp" :size="18" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

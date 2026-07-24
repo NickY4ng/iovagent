@@ -27,8 +27,6 @@ const navs: { icon: string; id: PageId; label: string }[] = [
   { id: 'orders', label: '运单列表', icon: strokeIconPaths.list },
   { id: 'risk', label: '异常运单列表', icon: strokeIconPaths.shield },
   { id: 'detail', label: '运单详情与地图', icon: strokeIconPaths.map },
-  { id: 'analytics', label: '统计归因', icon: strokeIconPaths.gauge },
-  { id: 'projects', label: '项目管理', icon: strokeIconPaths.settings },
   { id: 'downloads', label: '下载任务', icon: strokeIconPaths.download },
 ];
 
@@ -88,7 +86,18 @@ function logout() {
     </div>
 
     <div class="flex h-0 flex-1 flex-col px-3 pb-3">
-      <div class="mb-2 px-1 text-xs font-medium text-slate-500">项目</div>
+      <div class="mb-2 flex h-7 items-center justify-between px-1">
+        <div class="text-xs font-medium text-slate-500">项目</div>
+        <button
+          type="button"
+          class="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs transition"
+          :class="isNavActive('projects') ? 'bg-white font-medium text-slate-950' : 'text-slate-500 hover:bg-white/75 hover:text-slate-800'"
+          @click="goNav('projects')"
+        >
+          <Icon :svg="strokeIconPaths.settings" :size="13" />
+          管理
+        </button>
+      </div>
       <div class="min-h-0 flex-1 divide-y divide-[#deded9] overflow-y-auto">
         <button
           v-for="p in projects"

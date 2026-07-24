@@ -11,8 +11,9 @@ import { strokeIconPaths } from '../strokeIconPaths';
 import { useAgentWorkNav } from '../useAgentWorkNav';
 import { badgeToneClass, projectStatusTone } from '../utils';
 
-type SkillType = 'data' | 'logistics';
+type SkillType = 'capacity' | 'data' | 'logistics' | 'operations';
 type SkillTab = 'all' | SkillType;
+type SkillUsage = '付费' | '免费' | '短信费' | '需登录' | '需连接';
 type LoginAgentStatus = 'complete' | 'idle' | 'running' | 'waitingCode';
 type LoginMessageRole = 'agent' | 'system' | 'user';
 
@@ -21,8 +22,8 @@ interface ProjectSkill {
   icon: string;
   id: string;
   name: string;
-  requiresLogin: boolean;
   type: SkillType;
+  usage: SkillUsage;
 }
 
 interface LoginAgentMessage {
@@ -41,6 +42,8 @@ const projectName = ref('');
 const activeTab = ref<SkillTab>('all');
 const selectedDataSkillId = ref('');
 const selectedLogisticsSkillIds = ref<string[]>([...defaultLogisticsSkillIds]);
+const selectedOperationsSkillIds = ref<string[]>([]);
+const selectedCapacitySkillIds = ref<string[]>([]);
 const authorizedSkillIds = ref<string[]>([]);
 const pendingLoginSkill = ref<ProjectSkill | null>(null);
 const loginAgentStatus = ref<LoginAgentStatus>('idle');
@@ -59,11 +62,15 @@ const tabs: { id: SkillTab; label: string }[] = [
   { id: 'all', label: '全部' },
   { id: 'data', label: '数据员工' },
   { id: 'logistics', label: '物流专家' },
+  { id: 'operations', label: '运营协同' },
+  { id: 'capacity', label: '运力与货源' },
 ];
 
 const skillTypeLabels: Record<SkillType, string> = {
+  capacity: '运力与货源',
   data: '数据员工',
   logistics: '物流专家',
+  operations: '运营协同',
 };
 
 const skills: ProjectSkill[] = [
@@ -72,7 +79,7 @@ const skills: ProjectSkill[] = [
     name: '金隅水泥TMS',
     type: 'data',
     description: '连接金隅水泥TMS，读取发运、车辆、承运商与在途状态数据。',
-    requiresLogin: true,
+    usage: '需登录',
     icon: strokeIconPaths.zap,
   },
   {
@@ -80,7 +87,7 @@ const skills: ProjectSkill[] = [
     name: '智链顺达TMS',
     type: 'data',
     description: '连接智链顺达TMS，自动同步运输任务、轨迹状态和异常事件。',
-    requiresLogin: true,
+    usage: '需登录',
     icon: strokeIconPaths.zap,
   },
   {
@@ -88,7 +95,7 @@ const skills: ProjectSkill[] = [
     name: '今麦郎物流管理',
     type: 'data',
     description: '接入今麦郎物流管理系统，汇总运单、线路和履约过程数据。',
-    requiresLogin: true,
+    usage: '需登录',
     icon: strokeIconPaths.file,
   },
   {
@@ -96,7 +103,7 @@ const skills: ProjectSkill[] = [
     name: '表格运单',
     type: 'data',
     description: '通过表格导入运单数据，适合快速演示、离线对账和批量补录场景。',
-    requiresLogin: false,
+    usage: '免费',
     icon: strokeIconPaths.list,
   },
   {
@@ -104,7 +111,7 @@ const skills: ProjectSkill[] = [
     name: 'TMS同步员工',
     type: 'data',
     description: '连接业务系统，自动同步运单、车辆、司机与在途状态。',
-    requiresLogin: true,
+    usage: '需登录',
     icon: strokeIconPaths.zap,
   },
   {
@@ -112,7 +119,7 @@ const skills: ProjectSkill[] = [
     name: '在途风险专家',
     type: 'logistics',
     description: '结合线路、时效和历史履约表现，识别高优先级在途风险。',
-    requiresLogin: false,
+    usage: '付费',
     icon: strokeIconPaths.shield,
   },
   {
@@ -120,7 +127,7 @@ const skills: ProjectSkill[] = [
     name: '轨迹真实性专家',
     type: 'logistics',
     description: '分析轨迹断点、速度跳变和定位漂移，辅助判断GPS造假风险。',
-    requiresLogin: false,
+    usage: '付费',
     icon: strokeIconPaths.map,
   },
   {
@@ -128,7 +135,7 @@ const skills: ProjectSkill[] = [
     name: '异常停车专家',
     type: 'logistics',
     description: '识别服务区、物流园、中转仓等停靠点，区分合理休息和高风险长停。',
-    requiresLogin: false,
+    usage: '付费',
     icon: strokeIconPaths.truck,
   },
   {
@@ -136,15 +143,149 @@ const skills: ProjectSkill[] = [
     name: '到货时效专家',
     type: 'logistics',
     description: '评估预计到达时间、晚点风险和卸货超时，输出时效处置建议。',
-    requiresLogin: false,
+    usage: '付费',
     icon: strokeIconPaths.gauge,
+  },
+  {
+    id: 'logistics-route-planning',
+    name: '物流路线规划',
+    type: 'logistics',
+    description: '结合起讫地、车型、限行和实时路况规划运输路线，输出里程、时效与备选方案。',
+    usage: '付费',
+    icon: strokeIconPaths.route,
+  },
+  {
+    id: 'vehicle-location-query',
+    name: '车辆定位查询',
+    type: 'logistics',
+    description: '查询车辆最新位置、定位时间、速度和方向，为运单补充实时车辆位置信息。',
+    usage: '付费',
+    icon: strokeIconPaths.locate,
+  },
+  {
+    id: 'vehicle-trace-query',
+    name: '轨迹查询',
+    type: 'logistics',
+    description: '查询车辆历史行驶轨迹、停靠点和里程，辅助核验线路、在途状态与异常事件。',
+    usage: '付费',
+    icon: strokeIconPaths.waypoints,
+  },
+  {
+    id: 'waybill-data-completion',
+    name: '运单补充',
+    type: 'logistics',
+    description: '识别运单缺失字段，补充车辆、司机、线路和运输节点等信息，提升运单数据完整性。',
+    usage: '付费',
+    icon: strokeIconPaths.filePlus,
+  },
+  {
+    id: 'waybill-data-correction',
+    name: '运单纠错',
+    type: 'logistics',
+    description: '校验运单字段与业务规则，发现并修正地址、时间、车辆和状态等异常数据。',
+    usage: '付费',
+    icon: strokeIconPaths.filePen,
+  },
+  {
+    id: 'operations-logistics-sheet',
+    name: '物流表格',
+    type: 'operations',
+    description: '自动生成和维护运输台账、异常清单与对账表，支持运营协同和结果沉淀。',
+    usage: '免费',
+    icon: strokeIconPaths.fileSpreadsheet,
+  },
+  {
+    id: 'operations-sms-notification',
+    name: '短信通知',
+    type: 'operations',
+    description: '遇到在途异常可以短信通知货主、司机、物流负责人等。',
+    usage: '短信费',
+    icon: strokeIconPaths.messageText,
+  },
+  {
+    id: 'operations-logistics-weather',
+    name: '物流天气',
+    type: 'operations',
+    description: '结合线路和车辆实时位置获取沿途天气预警，辅助提前安排绕行、时效与安全处置。',
+    usage: '付费',
+    icon: strokeIconPaths.cloudSun,
+  },
+  {
+    id: 'operations-license-recognition',
+    name: '证照识别',
+    type: 'operations',
+    description: '识别驾驶证、行驶证、运输证及回单等资料，自动提取字段并校验证照有效性。',
+    usage: '付费',
+    icon: strokeIconPaths.scanText,
+  },
+  {
+    id: 'operations-wecom-suite',
+    name: '企业微信套件',
+    type: 'operations',
+    description: '连接企业微信，将在途风险、协同待办和处置结果同步到群聊、消息与工作台。',
+    usage: '需连接',
+    icon: strokeIconPaths.messages,
+  },
+  {
+    id: 'operations-feishu-suite',
+    name: '飞书套件',
+    type: 'operations',
+    description: '连接飞书，将运单异常、协同任务和处置进展同步到消息、群组与多维表格。',
+    usage: '需连接',
+    icon: strokeIconPaths.panels,
+  },
+  {
+    id: 'operations-dingtalk-suite',
+    name: '钉钉套件',
+    type: 'operations',
+    description: '连接钉钉，将在途预警、审批待办和运营结果推送到群聊与工作通知。',
+    usage: '需连接',
+    icon: strokeIconPaths.bellRing,
+  },
+  {
+    id: 'capacity-find-carrier',
+    name: '找运力',
+    type: 'capacity',
+    description: '将货源信息发布至运力生态，供司机或承运方接单。',
+    usage: '免费',
+    icon: strokeIconPaths.speaker,
+  },
+  {
+    id: 'capacity-quote-query',
+    name: '报价查询',
+    type: 'capacity',
+    description: '查询司机或承运方的抢单及报价信息。',
+    usage: '免费',
+    icon: strokeIconPaths.receipt,
+  },
+  {
+    id: 'capacity-cargo-search',
+    name: '搜索货源',
+    type: 'capacity',
+    description: '搜索平台已发布的货源信息。',
+    usage: '免费',
+    icon: strokeIconPaths.packageSearch,
+  },
+  {
+    id: 'capacity-private-fleet',
+    name: '私有运力池',
+    type: 'capacity',
+    description: '管理企业自有及长期合作的司机、车辆和承运商资源，支持定向询价与派单。',
+    usage: '付费',
+    icon: strokeIconPaths.usersRound,
   },
 ];
 
 const projectNameLength = computed(() => Array.from(projectName.value).length);
 const filteredSkills = computed(() => (activeTab.value === 'all' ? skills : skills.filter((skill) => skill.type === activeTab.value)));
 const selectedSkills = computed(() =>
-  skills.filter((skill) => skill.id === selectedDataSkillId.value || selectedLogisticsSkillIds.value.includes(skill.id)),
+  skills.filter(
+    (skill) =>
+      skill.id === selectedDataSkillId.value ||
+      selectedLogisticsSkillIds.value.includes(skill.id) ||
+      selectedOperationsSkillIds.value.includes(skill.id) ||
+      selectedCapacitySkillIds.value.includes(skill.id),
+  ),
 );
 const editingProjectId = computed(() => {
   const projectId = Array.isArray(route.query.projectId) ? route.query.projectId[0] : route.query.projectId;
@@ -180,6 +321,8 @@ function initializeProjectForm() {
     projectName.value = '';
     selectedDataSkillId.value = '';
     selectedLogisticsSkillIds.value = [...defaultLogisticsSkillIds];
+    selectedOperationsSkillIds.value = [];
+    selectedCapacitySkillIds.value = [];
     authorizedSkillIds.value = [];
     return;
   }
@@ -189,7 +332,9 @@ function initializeProjectForm() {
   projectName.value = project.name;
   selectedDataSkillId.value = dataSkill?.id ?? '';
   selectedLogisticsSkillIds.value = projectSkillIds.filter((id) => skills.some((skill) => skill.id === id && skill.type === 'logistics'));
-  authorizedSkillIds.value = dataSkill?.requiresLogin ? [dataSkill.id] : [];
+  selectedOperationsSkillIds.value = projectSkillIds.filter((id) => skills.some((skill) => skill.id === id && skill.type === 'operations'));
+  selectedCapacitySkillIds.value = projectSkillIds.filter((id) => skills.some((skill) => skill.id === id && skill.type === 'capacity'));
+  authorizedSkillIds.value = dataSkill?.usage === '需登录' ? [dataSkill.id] : [];
 }
 
 function handleProjectNameInput(event: Event) {
@@ -201,11 +346,15 @@ function handleProjectNameInput(event: Event) {
 
 function isSkillSelected(skill: ProjectSkill) {
   if (skill.type === 'data') return selectedDataSkillId.value === skill.id;
-  return selectedLogisticsSkillIds.value.includes(skill.id);
+  if (skill.type === 'logistics') return selectedLogisticsSkillIds.value.includes(skill.id);
+  if (skill.type === 'operations') return selectedOperationsSkillIds.value.includes(skill.id);
+  return selectedCapacitySkillIds.value.includes(skill.id);
 }
 
 function skillAvatarClass(skill: ProjectSkill) {
   if (skill.type === 'data') return 'bg-[#eef6f1] text-emerald-700';
+  if (skill.type === 'operations') return 'bg-[#edf6f7] text-cyan-700';
+  if (skill.type === 'capacity') return 'bg-[#eef4fb] text-blue-700';
   return 'bg-[#eef2f7] text-slate-700';
 }
 
@@ -215,7 +364,7 @@ function toggleSkill(skill: ProjectSkill) {
       selectedDataSkillId.value = '';
       return;
     }
-    if (skill.requiresLogin && !authorizedSkillIds.value.includes(skill.id)) {
+    if (skill.usage === '需登录' && !authorizedSkillIds.value.includes(skill.id)) {
       pendingLoginSkill.value = skill;
       resetLoginAgentState();
       loginForm.username = '';
@@ -226,11 +375,13 @@ function toggleSkill(skill: ProjectSkill) {
     return;
   }
 
-  if (selectedLogisticsSkillIds.value.includes(skill.id)) {
-    selectedLogisticsSkillIds.value = selectedLogisticsSkillIds.value.filter((id) => id !== skill.id);
+  const selectedSkillIds =
+    skill.type === 'logistics' ? selectedLogisticsSkillIds : skill.type === 'operations' ? selectedOperationsSkillIds : selectedCapacitySkillIds;
+  if (selectedSkillIds.value.includes(skill.id)) {
+    selectedSkillIds.value = selectedSkillIds.value.filter((id) => id !== skill.id);
     return;
   }
-  selectedLogisticsSkillIds.value = [...selectedLogisticsSkillIds.value, skill.id];
+  selectedSkillIds.value = [...selectedSkillIds.value, skill.id];
 }
 
 function clearLoginAgentTimers() {
@@ -483,7 +634,7 @@ onBeforeUnmount(() => {
                 {{ skillTypeLabels[skill.type] }}
               </span>
               <span class="rounded-md bg-[#f1f1ef] px-2 py-1 text-xs leading-4 text-slate-600">
-                {{ skill.requiresLogin ? '需登录' : '无' }}
+                {{ skill.usage }}
               </span>
               <span
                 class="rounded-md px-2 py-1 text-xs font-medium leading-4"

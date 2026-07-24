@@ -50,10 +50,19 @@ export interface ChatMessage {
   title?: string;
   status?: string;
   result?: string;
+  activeStepIndex?: number;
+  file?: AgentResultFile;
+  progressMode?: boolean;
   steps?: {
     title: string;
     text: string;
+    skill?: string;
   }[];
+}
+
+export interface AgentResultFile {
+  name: string;
+  url: string;
 }
 
 export interface DownloadTask {

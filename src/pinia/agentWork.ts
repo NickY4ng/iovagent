@@ -1,4 +1,4 @@
-import type { ChatMessage, DownloadTask, Order, PageId, Project, TimelineEvent } from '@/views/AgentWork/interface';
+import type { AgentResultFile, ChatMessage, DownloadTask, Order, PageId, Project, TimelineEvent } from '@/views/AgentWork/interface';
 
 import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
@@ -45,7 +45,7 @@ const projectsSeed: Project[] = [
   {
     id: 'P003',
     name: '西南工厂发运项目',
-    status: '连接中',
+    status: '已连接',
     sync: '同步中',
     total: 83,
     risk: 6,
@@ -54,32 +54,6 @@ const projectsSeed: Project[] = [
     keyword: '西南工厂',
     statusFilter: '装货中',
     skillIds: ['zhilian-shunda-tms', 'route-risk-expert', 'gps-trace-expert'],
-  },
-  {
-    id: 'P004',
-    name: '西南工厂发运项目',
-    status: '连接中',
-    sync: '同步中',
-    total: 83,
-    risk: 6,
-    tmsUrl: 'https://tms.southwest.example.com',
-    tmsUser: 'sw_factory',
-    keyword: '西南工厂',
-    statusFilter: '在途',
-    skillIds: ['jinmailang-logistics', 'route-risk-expert', 'parking-event-expert'],
-  },
-  {
-    id: 'P005',
-    name: '西南工厂发运项目',
-    status: '连接中',
-    sync: '同步中',
-    total: 83,
-    risk: 6,
-    tmsUrl: 'https://tms.southwest.example.com',
-    tmsUser: 'sw_factory',
-    keyword: '西南工厂',
-    statusFilter: '已到货',
-    skillIds: ['tms-sync-employee', 'route-risk-expert', 'delivery-sla-expert'],
   },
 ];
 
@@ -218,6 +192,7 @@ export const rightPanelTabs: [string, string][] = [
 
 const processStepInitialDelay = 360;
 const processStepInterval = 680;
+const spreadsheetProcessStepInterval = 1200;
 let agentProcessTimers: ReturnType<typeof setTimeout>[] = [];
 
 const warningProcessSteps = [
@@ -235,6 +210,73 @@ const orderEventProcessSteps = [
   { title: '渲染地图轨迹', text: '已加载运输路线、当前位置、装卸货节点和停靠点。' },
   { title: '标注异常事件', text: '已标注高速服务区低风险停车和第三方中转仓高风险停车。' },
 ];
+
+function createSpreadsheetFillSteps(sourceFileName: string): NonNullable<ChatMessage['steps']> {
+  return [
+    { title: '解析 Excel', text: `读取“${sourceFileName}”，识别工作表结构、128 行运单和 12 个已有字段。` },
+    { title: '识别待填字段', text: '发现“当前车辆位置、在途状态、预计到达时间、在途异常”存在批量空值，需要逐项补充。' },
+    { title: '核验运单真实性', text: '比对 TMS 原始运单、车牌、司机和线路关系，确认 126 条有效，标记 2 条待复核记录。' },
+    {
+      title: '纠正基础数据',
+      text: '修正 3 处车牌格式、2 处地址语义和 1 处运单状态冲突。',
+      skill: '运单纠错',
+    },
+    {
+      title: '查询车辆位置',
+      text: '按车牌批量获取最新定位、定位时间、速度和方向，回填“当前车辆位置”。',
+      skill: '车辆定位查询',
+    },
+    {
+      title: '查询行驶轨迹',
+      text: '查询近 24 小时轨迹、停靠点和行驶里程，辅助判断车辆实际在途状态。',
+      skill: '轨迹查询',
+    },
+    {
+      title: '判断在途风险',
+      text: '结合偏航、长停、轨迹断点和非计划经停，回填“在途异常”及风险说明。',
+      skill: '在途风险专家',
+    },
+    {
+      title: '计算预计到达',
+      text: '根据实时位置、剩余里程、道路拥堵和历史线路时效，回填“预计到达时间”。',
+      skill: '到货时效专家',
+    },
+    {
+      title: '补充运单表格',
+      text: '将查询与分析结果写入对应行，保持原工作表字段顺序和单元格格式。',
+      skill: '运单补充',
+    },
+    { title: '复检输出结果', text: '复核字段格式、空值、跨字段一致性和异常标记，128 行运单全部检验完成。' },
+  ];
+}
+
+function extractSpreadsheetRequest(raw: string) {
+  const attachmentMarker = '\n附件：';
+  const markerIndex = raw.lastIndexOf(attachmentMarker);
+  if (markerIndex <= 0) return null;
+
+  const prompt = raw.slice(0, markerIndex).trim();
+  const sourceFileName = raw
+    .slice(markerIndex + attachmentMarker.length)
+    .split('、')
+    .map((name) => name.trim())
+    .find(Boolean);
+  if (!prompt || !sourceFileName) return null;
+  return { prompt, sourceFileName };
+}
+
+function formatFileTimestamp(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
+function createSpreadsheetResultFile(sourceFileName: string): AgentResultFile {
+  const sourceBaseName = sourceFileName.replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_') || '运单表';
+  return {
+    name: `${sourceBaseName}_智能补全_${formatFileTimestamp(new Date())}.xlsx`,
+    url: '/demo/waybill-fill-result.xlsx',
+  };
+}
 
 function clearAgentProcessTimers() {
   agentProcessTimers.forEach((timer) => clearTimeout(timer));
@@ -459,8 +501,14 @@ export const agentWorkData = defineStore('agentWork', {
       const raw = text ?? this.agentInput;
       if (!raw.trim()) return;
       const next: ChatMessage[] = [...this.agentMessages, { role: 'user', text: raw }];
+      const spreadsheetRequest = extractSpreadsheetRequest(raw);
       const mcpPrompt = extractMcpPrompt(raw);
       let replyMessage: ChatMessage = { role: 'agent', text: '已处理你的请求。结果已显示在右侧面板。' };
+      if (spreadsheetRequest) {
+        this.startSpreadsheetFillProcess(next, spreadsheetRequest.sourceFileName);
+        this.agentInput = '';
+        return;
+      }
       if (mcpPrompt) {
         await this.startMcpPromptTest(next, mcpPrompt);
         this.agentInput = '';
@@ -506,6 +554,44 @@ export const agentWorkData = defineStore('agentWork', {
       }
       this.agentMessages = [...next, replyMessage];
       this.agentInput = '';
+    },
+    startSpreadsheetFillProcess(next: ChatMessage[], sourceFileName: string) {
+      const steps = createSpreadsheetFillSteps(sourceFileName);
+      const resultFile = createSpreadsheetResultFile(sourceFileName);
+      const messageIndex = next.length;
+      this.agentMessages = [
+        ...next,
+        {
+          role: 'agent',
+          title: '智能填表任务',
+          status: '处理中',
+          text: `已接收“${sourceFileName}”，正在依据空缺字段编排物流专家技能。`,
+          steps,
+          result: '',
+          progressMode: true,
+          activeStepIndex: 0,
+        },
+      ];
+
+      steps.forEach((_, stepIndex) => {
+        const timer = setTimeout(() => {
+          const completedStepCount = stepIndex + 1;
+          const isComplete = completedStepCount === steps.length;
+          this.agentMessages = this.agentMessages.map((message, index) => {
+            if (index !== messageIndex) return message;
+            return {
+              ...message,
+              activeStepIndex: completedStepCount,
+              status: isComplete ? '已完成' : '处理中',
+              result: isComplete ? '任务执行完成，已补全 128 行运单并通过最终检验。' : '',
+              file: isComplete ? resultFile : undefined,
+            };
+          });
+
+          if (isComplete) clearAgentProcessTimers();
+        }, (stepIndex + 1) * spreadsheetProcessStepInterval);
+        agentProcessTimers.push(timer);
+      });
     },
     startDelayedAgentProcess(next: ChatMessage[], finalMessage: ChatMessage, onComplete: () => void) {
       const steps = finalMessage.steps ?? [];
