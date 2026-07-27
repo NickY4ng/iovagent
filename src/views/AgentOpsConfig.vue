@@ -49,6 +49,7 @@ interface EnterpriseOption {
 interface ManagedSkill {
   category: SkillCategory;
   content: string;
+  description: string;
   enabled: boolean;
   enterpriseIds: string[];
   fileName: string;
@@ -101,6 +102,7 @@ const enterpriseSearch = ref('');
 const employeeEnterpriseSearch = ref('');
 const skillForm = reactive({
   category: '物流专家' as SkillCategory,
+  description: '',
   enterpriseIds: [] as string[],
   fileContent: '',
   fileName: '',
@@ -288,10 +290,34 @@ const skillSeed: Array<{
   { id: 'capacity-private-fleet', name: '私有运力池', category: '运力与货源', visibility: '指定企业', enterpriseIds: ['ent-anjie', 'ent-east'] },
 ];
 
+const skillDescriptions: Record<string, string> = {
+  'route-risk-expert': '结合线路、时效和历史履约表现，识别高优先级在途风险。',
+  'gps-trace-expert': '分析轨迹断点、速度跳变和定位漂移，辅助判断GPS造假风险。',
+  'parking-event-expert': '识别服务区、物流园、中转仓等停靠点，区分合理休息和高风险长停。',
+  'delivery-sla-expert': '评估预计到达时间、晚点风险和卸货超时，输出时效处置建议。',
+  'logistics-route-planning': '结合起讫地、车型、限行和实时路况规划运输路线，输出里程、时效与备选方案。',
+  'vehicle-location-query': '查询车辆最新位置、定位时间、速度和方向，为运单补充实时车辆位置信息。',
+  'vehicle-trace-query': '查询车辆历史行驶轨迹、停靠点和里程，辅助核验线路、在途状态与异常事件。',
+  'waybill-data-completion': '识别运单缺失字段，补充车辆、司机、线路和运输节点等信息，提升运单数据完整性。',
+  'waybill-data-correction': '校验运单字段与业务规则，发现并修正地址、时间、车辆和状态等异常数据。',
+  'operations-logistics-sheet': '自动生成和维护运输台账、异常清单与对账表，支持运营协同和结果沉淀。',
+  'operations-sms-notification': '遇到在途异常可以短信通知货主、司机、物流负责人等。',
+  'operations-logistics-weather': '结合线路和车辆实时位置获取沿途天气预警，辅助提前安排绕行、时效与安全处置。',
+  'operations-license-recognition': '识别驾驶证、行驶证、运输证及回单等资料，自动提取字段并校验证照有效性。',
+  'operations-wecom-suite': '连接企业微信，将在途风险、协同待办和处置结果同步到群聊、消息与工作台。',
+  'operations-feishu-suite': '连接飞书，将运单异常、协同任务和处置进展同步到消息、群组与多维表格。',
+  'operations-dingtalk-suite': '连接钉钉，将在途预警、审批待办和运营结果推送到群聊与工作通知。',
+  'capacity-find-carrier': '将货源信息发布至运力生态，供司机或承运方接单。',
+  'capacity-quote-query': '查询司机或承运方的抢单及报价信息。',
+  'capacity-cargo-search': '搜索平台已发布的货源信息。',
+  'capacity-private-fleet': '管理企业自有及长期合作的司机、车辆和承运商资源，支持定向询价与派单。',
+};
+
 const managedSkills = ref<ManagedSkill[]>(
   skillSeed.map((skill, index) => ({
     ...skill,
     content: `# ${skill.name}\n\n## 适用范围\n${skill.category}\n\n## 执行指引\n根据用户任务识别所需数据和业务约束，调用 ${skill.name} 完成处理，并返回结构化结果与必要的执行说明。`,
+    description: skillDescriptions[skill.id] ?? '',
     enabled: index !== 18,
     enterpriseIds: skill.enterpriseIds ?? [],
     fileName: `${skill.id}.skill.md`,
@@ -368,7 +394,7 @@ const filteredManagedSkills = computed(() => {
   const search = skillSearch.value.trim().toLowerCase();
   return managedSkills.value.filter((skill) => {
     const matchesCategory = skillCategoryFilter.value === '全部' || skill.category === skillCategoryFilter.value;
-    const matchesSearch = !search || `${skill.name} ${skill.fileName} ${skill.category}`.toLowerCase().includes(search);
+    const matchesSearch = !search || `${skill.name} ${skill.description} ${skill.fileName} ${skill.category}`.toLowerCase().includes(search);
     return matchesCategory && matchesSearch;
   });
 });
@@ -655,6 +681,7 @@ function resetSkillForm() {
   editingSkillId.value = '';
   enterpriseSearch.value = '';
   skillForm.name = '';
+  skillForm.description = '';
   skillForm.category = '物流专家';
   skillForm.visibility = '全部企业';
   skillForm.enterpriseIds = [];
@@ -671,6 +698,7 @@ function openEditSkillModal(skill: ManagedSkill) {
   editingSkillId.value = skill.id;
   enterpriseSearch.value = '';
   skillForm.name = skill.name;
+  skillForm.description = skill.description;
   skillForm.category = skill.category;
   skillForm.visibility = skill.visibility;
   skillForm.enterpriseIds = [...skill.enterpriseIds];
@@ -701,8 +729,13 @@ async function uploadSkillFormFile(event: Event) {
 
 function confirmSkillForm() {
   const name = skillForm.name.trim();
+  const description = skillForm.description.trim();
   if (!name) {
     ElMessage.warning('请输入 Skill 名称');
+    return;
+  }
+  if (!description) {
+    ElMessage.warning('请输入 Skill 描述');
     return;
   }
   if (skillForm.visibility === '指定企业' && skillForm.enterpriseIds.length === 0) {
@@ -721,6 +754,7 @@ function confirmSkillForm() {
         ? {
             ...skill,
             name,
+            description,
             category: skillForm.category,
             visibility: skillForm.visibility,
             enterpriseIds,
@@ -737,6 +771,7 @@ function confirmSkillForm() {
       {
         id: `custom-skill-${Date.now()}`,
         name,
+        description,
         category: skillForm.category,
         visibility: skillForm.visibility,
         enterpriseIds,
@@ -1047,6 +1082,7 @@ async function uploadSystemPrompt(event: Event) {
                         <span class="h-2 w-2 shrink-0 rounded-full" :class="skill.enabled ? 'bg-emerald-500' : 'bg-slate-300'" />
                         <div class="min-w-0">
                           <div class="truncate font-medium text-slate-950">{{ skill.name }}</div>
+                          <div class="mt-0.5 truncate text-xs text-slate-500" :title="skill.description">{{ skill.description }}</div>
                           <div class="mt-0.5 text-xs" :class="skill.enabled ? 'text-emerald-600' : 'text-slate-400'">{{ skill.enabled ? '已启用' : '已禁用' }}</div>
                         </div>
                       </div>
@@ -1158,6 +1194,15 @@ async function uploadSystemPrompt(event: Event) {
             </label>
           </div>
 
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-medium text-slate-600">Skill 描述</span>
+            <textarea
+              v-model.trim="skillForm.description"
+              class="min-h-[82px] w-full resize-none rounded-md border border-[#deded9] bg-[#fbfbfa] px-3 py-2 text-sm leading-5 outline-none focus:border-slate-400"
+              placeholder="请输入用户侧技能卡片展示的功能描述"
+            />
+          </label>
+
           <div>
             <span class="mb-1.5 block text-xs font-medium text-slate-600">Skill 可见范围</span>
             <div class="grid grid-cols-2 gap-2">
@@ -1245,6 +1290,7 @@ async function uploadSystemPrompt(event: Event) {
           <span>分类：<strong class="font-medium text-slate-700">{{ previewingSkill.category }}</strong></span>
           <span>可见范围：<strong class="font-medium text-slate-700">{{ formatSkillVisibility(previewingSkill) }}</strong></span>
           <span>最后更新：<strong class="font-medium text-slate-700">{{ previewingSkill.updatedAt }} · {{ previewingSkill.updatedBy }}</strong></span>
+          <p class="w-full pt-1 text-sm leading-5 text-slate-600">{{ previewingSkill.description }}</p>
         </div>
         <pre class="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-[#fbfbfa] p-5 text-xs leading-6 text-slate-700">{{ previewingSkill.content }}</pre>
       </div>
