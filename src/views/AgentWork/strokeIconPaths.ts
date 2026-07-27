@@ -7,6 +7,7 @@ export const strokeIconPaths = {
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   locate: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 2v2M12 20v2M2 12h2M20 12h2',
   download: 'M12 3v12m0 0 4-4m-4 4-4-4M5 21h14',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Zm10-3a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',
   file: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h6',
   filePen:
     'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6M14 2v6h6v4M13 18l6.5-6.5 2 2L15 20h-2v-2Z',
@@ -48,4 +49,6 @@ export const strokeIconPaths = {
   scanText:
     'M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8h8M7 12h10M7 16h6',
   speaker: 'M3 11v3l18 5V6L3 11ZM11.5 16.4 13 22H8l-2-7',
+  trash: 'M3 6h18M8 6V4h8v2M6 6l1 16h10l1-16M10 11v6M14 11v6',
+  upload: 'M12 16V4m0 0-4 4m4-4 4 4M5 20h14',
 } as const;
