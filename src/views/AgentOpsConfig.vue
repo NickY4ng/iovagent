@@ -9,7 +9,7 @@ import { strokeIconPaths } from './AgentWork/strokeIconPaths';
 
 type ConfigTab = 'dataset' | 'employees' | 'skills';
 type LoginType = '短信验证码' | '手机扫码' | '图形验证码' | '无验证';
-type SkillCategory = '物流专家' | '运营协同' | '运力与货源';
+type SkillCategory = '在途专家' | '智数分析专家' | '运营助手' | '运力与货源';
 type SkillManagementTab = 'skills' | 'systemPrompt';
 type SkillVisibility = '全部企业' | '指定企业';
 
@@ -101,7 +101,7 @@ const skillCategoryFilter = ref<'全部' | SkillCategory>('全部');
 const enterpriseSearch = ref('');
 const employeeEnterpriseSearch = ref('');
 const skillForm = reactive({
-  category: '物流专家' as SkillCategory,
+  category: '在途专家' as SkillCategory,
   description: '',
   enterpriseIds: [] as string[],
   fileContent: '',
@@ -268,22 +268,22 @@ const skillSeed: Array<{
   name: string;
   visibility?: SkillVisibility;
 }> = [
-  { id: 'route-risk-expert', name: '在途风险专家', category: '物流专家' },
-  { id: 'gps-trace-expert', name: '轨迹真实性专家', category: '物流专家' },
-  { id: 'parking-event-expert', name: '异常停车专家', category: '物流专家' },
-  { id: 'delivery-sla-expert', name: '到货时效专家', category: '物流专家' },
-  { id: 'logistics-route-planning', name: '物流路线规划', category: '物流专家' },
-  { id: 'vehicle-location-query', name: '车辆定位查询', category: '物流专家' },
-  { id: 'vehicle-trace-query', name: '轨迹查询', category: '物流专家' },
-  { id: 'waybill-data-completion', name: '运单补充', category: '物流专家' },
-  { id: 'waybill-data-correction', name: '运单纠错', category: '物流专家' },
-  { id: 'operations-logistics-sheet', name: '物流表格', category: '运营协同' },
-  { id: 'operations-sms-notification', name: '短信通知', category: '运营协同' },
-  { id: 'operations-logistics-weather', name: '物流天气', category: '运营协同' },
-  { id: 'operations-license-recognition', name: '证照识别', category: '运营协同' },
-  { id: 'operations-wecom-suite', name: '企业微信套件', category: '运营协同' },
-  { id: 'operations-feishu-suite', name: '飞书套件', category: '运营协同' },
-  { id: 'operations-dingtalk-suite', name: '钉钉套件', category: '运营协同' },
+  { id: 'route-risk-expert', name: '在途风险专家', category: '在途专家' },
+  { id: 'gps-trace-expert', name: '轨迹真实性专家', category: '在途专家' },
+  { id: 'parking-event-expert', name: '异常停车专家', category: '在途专家' },
+  { id: 'delivery-sla-expert', name: '到货时效专家', category: '在途专家' },
+  { id: 'logistics-route-planning', name: '物流路线规划', category: '在途专家' },
+  { id: 'vehicle-location-query', name: '车辆定位查询', category: '在途专家' },
+  { id: 'vehicle-trace-query', name: '轨迹查询', category: '在途专家' },
+  { id: 'waybill-data-completion', name: '运单补充', category: '在途专家' },
+  { id: 'waybill-data-correction', name: '运单纠错', category: '在途专家' },
+  { id: 'operations-logistics-sheet', name: '物流表格', category: '运营助手' },
+  { id: 'operations-sms-notification', name: '短信通知', category: '运营助手' },
+  { id: 'operations-logistics-weather', name: '物流天气', category: '运营助手' },
+  { id: 'operations-license-recognition', name: '证照识别', category: '运营助手' },
+  { id: 'operations-wecom-suite', name: '企业微信套件', category: '运营助手' },
+  { id: 'operations-feishu-suite', name: '飞书套件', category: '运营助手' },
+  { id: 'operations-dingtalk-suite', name: '钉钉套件', category: '运营助手' },
   { id: 'capacity-find-carrier', name: '找运力', category: '运力与货源' },
   { id: 'capacity-quote-query', name: '报价查询', category: '运力与货源' },
   { id: 'capacity-cargo-search', name: '搜索货源', category: '运力与货源' },
@@ -300,7 +300,7 @@ const skillDescriptions: Record<string, string> = {
   'vehicle-trace-query': '查询车辆历史行驶轨迹、停靠点和里程，辅助核验线路、在途状态与异常事件。',
   'waybill-data-completion': '识别运单缺失字段，补充车辆、司机、线路和运输节点等信息，提升运单数据完整性。',
   'waybill-data-correction': '校验运单字段与业务规则，发现并修正地址、时间、车辆和状态等异常数据。',
-  'operations-logistics-sheet': '自动生成和维护运输台账、异常清单与对账表，支持运营协同和结果沉淀。',
+  'operations-logistics-sheet': '自动生成和维护运输台账、异常清单与对账表，支持运营助手处理和结果沉淀。',
   'operations-sms-notification': '遇到在途异常可以短信通知货主、司机、物流负责人等。',
   'operations-logistics-weather': '结合线路和车辆实时位置获取沿途天气预警，辅助提前安排绕行、时效与安全处置。',
   'operations-license-recognition': '识别驾驶证、行驶证、运输证及回单等资料，自动提取字段并校验证照有效性。',
@@ -353,7 +353,7 @@ const skillManagementTabs: { id: SkillManagementTab; label: string }[] = [
   { id: 'skills', label: 'Skill 列表' },
   { id: 'systemPrompt', label: 'System Prompt 管理' },
 ];
-const skillCategoryOptions: Array<'全部' | SkillCategory> = ['全部', '物流专家', '运营协同', '运力与货源'];
+const skillCategoryOptions: Array<'全部' | SkillCategory> = ['全部', '在途专家', '智数分析专家', '运营助手', '运力与货源'];
 const skillVisibilityOptions: SkillVisibility[] = ['全部企业', '指定企业'];
 
 const waybillFields: WaybillField[] = [
@@ -682,7 +682,7 @@ function resetSkillForm() {
   enterpriseSearch.value = '';
   skillForm.name = '';
   skillForm.description = '';
-  skillForm.category = '物流专家';
+  skillForm.category = '在途专家';
   skillForm.visibility = '全部企业';
   skillForm.enterpriseIds = [];
   skillForm.fileName = '';

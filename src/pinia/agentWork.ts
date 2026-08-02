@@ -565,7 +565,7 @@ export const agentWorkData = defineStore('agentWork', {
           role: 'agent',
           title: '智能填表任务',
           status: '处理中',
-          text: `已接收“${sourceFileName}”，正在依据空缺字段编排物流专家技能。`,
+          text: `已接收“${sourceFileName}”，正在依据空缺字段编排在途专家技能。`,
           steps,
           result: '',
           progressMode: true,

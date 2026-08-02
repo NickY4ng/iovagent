@@ -11,7 +11,7 @@ import { strokeIconPaths } from '../strokeIconPaths';
 import { useAgentWorkNav } from '../useAgentWorkNav';
 import { badgeToneClass, projectStatusTone } from '../utils';
 
-type SkillType = 'capacity' | 'data' | 'logistics' | 'operations';
+type SkillType = 'analysis' | 'capacity' | 'data' | 'logistics' | 'operations';
 type SkillTab = 'all' | SkillType;
 type SkillUsage = '付费' | '免费' | '短信费' | '需登录' | '需连接';
 type LoginAgentStatus = 'complete' | 'idle' | 'running' | 'waitingCode';
@@ -44,6 +44,7 @@ const selectedDataSkillId = ref('');
 const selectedLogisticsSkillIds = ref<string[]>([...defaultLogisticsSkillIds]);
 const selectedOperationsSkillIds = ref<string[]>([]);
 const selectedCapacitySkillIds = ref<string[]>([]);
+const selectedAnalysisSkillIds = ref<string[]>([]);
 const authorizedSkillIds = ref<string[]>([]);
 const pendingLoginSkill = ref<ProjectSkill | null>(null);
 const loginAgentStatus = ref<LoginAgentStatus>('idle');
@@ -61,16 +62,18 @@ let loginAgentTimers: number[] = [];
 const tabs: { id: SkillTab; label: string }[] = [
   { id: 'all', label: '全部' },
   { id: 'data', label: '数据员工' },
-  { id: 'logistics', label: '物流专家' },
-  { id: 'operations', label: '运营协同' },
+  { id: 'logistics', label: '在途专家' },
+  { id: 'analysis', label: '智数分析专家' },
+  { id: 'operations', label: '运营助手' },
   { id: 'capacity', label: '运力与货源' },
 ];
 
 const skillTypeLabels: Record<SkillType, string> = {
+  analysis: '智数分析专家',
   capacity: '运力与货源',
   data: '数据员工',
-  logistics: '物流专家',
-  operations: '运营协同',
+  logistics: '在途专家',
+  operations: '运营助手',
 };
 
 const skills: ProjectSkill[] = [
@@ -190,7 +193,7 @@ const skills: ProjectSkill[] = [
     id: 'operations-logistics-sheet',
     name: '物流表格',
     type: 'operations',
-    description: '自动生成和维护运输台账、异常清单与对账表，支持运营协同和结果沉淀。',
+    description: '自动生成和维护运输台账、异常清单与对账表，支持运营助手处理和结果沉淀。',
     usage: '免费',
     icon: strokeIconPaths.fileSpreadsheet,
   },
@@ -284,7 +287,8 @@ const selectedSkills = computed(() =>
       skill.id === selectedDataSkillId.value ||
       selectedLogisticsSkillIds.value.includes(skill.id) ||
       selectedOperationsSkillIds.value.includes(skill.id) ||
-      selectedCapacitySkillIds.value.includes(skill.id),
+      selectedCapacitySkillIds.value.includes(skill.id) ||
+      selectedAnalysisSkillIds.value.includes(skill.id),
   ),
 );
 const editingProjectId = computed(() => {
@@ -323,6 +327,7 @@ function initializeProjectForm() {
     selectedLogisticsSkillIds.value = [...defaultLogisticsSkillIds];
     selectedOperationsSkillIds.value = [];
     selectedCapacitySkillIds.value = [];
+    selectedAnalysisSkillIds.value = [];
     authorizedSkillIds.value = [];
     return;
   }
@@ -334,6 +339,7 @@ function initializeProjectForm() {
   selectedLogisticsSkillIds.value = projectSkillIds.filter((id) => skills.some((skill) => skill.id === id && skill.type === 'logistics'));
   selectedOperationsSkillIds.value = projectSkillIds.filter((id) => skills.some((skill) => skill.id === id && skill.type === 'operations'));
   selectedCapacitySkillIds.value = projectSkillIds.filter((id) => skills.some((skill) => skill.id === id && skill.type === 'capacity'));
+  selectedAnalysisSkillIds.value = projectSkillIds.filter((id) => skills.some((skill) => skill.id === id && skill.type === 'analysis'));
   authorizedSkillIds.value = dataSkill?.usage === '需登录' ? [dataSkill.id] : [];
 }
 
@@ -348,12 +354,14 @@ function isSkillSelected(skill: ProjectSkill) {
   if (skill.type === 'data') return selectedDataSkillId.value === skill.id;
   if (skill.type === 'logistics') return selectedLogisticsSkillIds.value.includes(skill.id);
   if (skill.type === 'operations') return selectedOperationsSkillIds.value.includes(skill.id);
+  if (skill.type === 'analysis') return selectedAnalysisSkillIds.value.includes(skill.id);
   return selectedCapacitySkillIds.value.includes(skill.id);
 }
 
 function skillAvatarClass(skill: ProjectSkill) {
   if (skill.type === 'data') return 'bg-[#eef6f1] text-emerald-700';
   if (skill.type === 'operations') return 'bg-[#edf6f7] text-cyan-700';
+  if (skill.type === 'analysis') return 'bg-amber-50 text-amber-700';
   if (skill.type === 'capacity') return 'bg-[#eef4fb] text-blue-700';
   return 'bg-[#eef2f7] text-slate-700';
 }
@@ -376,7 +384,13 @@ function toggleSkill(skill: ProjectSkill) {
   }
 
   const selectedSkillIds =
-    skill.type === 'logistics' ? selectedLogisticsSkillIds : skill.type === 'operations' ? selectedOperationsSkillIds : selectedCapacitySkillIds;
+    skill.type === 'logistics'
+      ? selectedLogisticsSkillIds
+      : skill.type === 'operations'
+        ? selectedOperationsSkillIds
+        : skill.type === 'analysis'
+          ? selectedAnalysisSkillIds
+          : selectedCapacitySkillIds;
   if (selectedSkillIds.value.includes(skill.id)) {
     selectedSkillIds.value = selectedSkillIds.value.filter((id) => id !== skill.id);
     return;
@@ -596,7 +610,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto p-5 pt-4">
-        <div class="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div v-if="filteredSkills.length" class="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <button
             v-for="skill in filteredSkills"
             :key="skill.id"
@@ -644,6 +658,12 @@ onBeforeUnmount(() => {
               </span>
             </div>
           </button>
+        </div>
+        <div v-else class="flex h-full min-h-[220px] flex-col items-center justify-center text-center">
+          <span class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+            <Icon :svg="strokeIconPaths.list" :size="17" />
+          </span>
+          <span class="mt-3 text-sm font-medium text-slate-600">暂无技能</span>
         </div>
       </div>
 
