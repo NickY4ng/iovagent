@@ -279,11 +279,37 @@ interface VehicleLocationDemo {
   speed: string;
 }
 
+const vehicleLocationQueryActions = ['查', '查询', '查找', '查看', '看看', '看下', '看一下', '帮我看', '帮我查', '获取', '调取', '检索', '搜索', '显示', '展示', '告诉我'];
+const vehicleLocationIntentTerms = [
+  '定位',
+  '轨迹',
+  '位置',
+  '坐标',
+  '经纬度',
+  '车辆动态',
+  '行车记录',
+  '行驶记录',
+  '行车路线',
+  '行驶路线',
+  '行驶路径',
+];
+const vehicleLocationTargetTerms = ['车辆', '这辆车', '该车', '车牌', '货车', '司机', '运单', '货物'];
+const vehicleLocationQuestionPattern = /(?:在哪(?:里|儿)?|到哪(?:里|儿)?了?|走到哪(?:里|儿)?了?|开到哪(?:里|儿)?了?|行驶到哪(?:里|儿)?了?|现在何处)/;
+const vehicleTrackingActionPattern = /(?:追踪|跟踪)(?:一下|下)?/;
+
 function extractVehicleLocationRequest(raw: string): VehicleLocationRequest | null {
-  if (!/查[^\n，。！？]{0,80}(轨迹|定位)/.test(raw)) return null;
   const normalized = raw.toUpperCase();
-  const plate = normalized.match(/[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-Z0-9]{5}/)?.[0] ?? '';
-  const waybill = normalized.match(/WB\d{8,}/)?.[0] ?? '';
+  const plate = normalized.match(/[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-Z0-9]{5,6}/)?.[0] ?? '';
+  const waybill =
+    normalized.match(/WB\d{8,}/)?.[0] ?? normalized.match(/(?:运单号?|单号)[:：\s-]*([A-Z0-9-]{6,})/)?.[1] ?? '';
+  const hasQueryAction = vehicleLocationQueryActions.some((term) => raw.includes(term));
+  const hasLocationIntent = vehicleLocationIntentTerms.some((term) => raw.includes(term));
+  const hasLocationQuestion = vehicleLocationQuestionPattern.test(raw);
+  const hasTrackingAction = vehicleTrackingActionPattern.test(raw);
+  const hasTarget = Boolean(plate || waybill || vehicleLocationTargetTerms.some((term) => raw.includes(term)));
+
+  const isLocationQuery = (hasQueryAction && (hasLocationIntent || hasLocationQuestion || hasTrackingAction)) || (hasTarget && (hasLocationIntent || hasLocationQuestion || hasTrackingAction));
+  if (!isLocationQuery) return null;
   return { plate, waybill };
 }
 
