@@ -265,6 +265,72 @@ function extractSpreadsheetRequest(raw: string) {
   return { prompt, sourceFileName };
 }
 
+interface VehicleLocationRequest {
+  plate: string;
+  waybill: string;
+}
+
+interface VehicleLocationDemo {
+  direction: string;
+  lastLocationTime: string;
+  latitude: string;
+  longitude: string;
+  poi: string;
+  speed: string;
+}
+
+function extractVehicleLocationRequest(raw: string): VehicleLocationRequest | null {
+  if (!/查[^\n，。！？]{0,80}(轨迹|定位)/.test(raw)) return null;
+  const normalized = raw.toUpperCase();
+  const plate = normalized.match(/[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-Z0-9]{5}/)?.[0] ?? '';
+  const waybill = normalized.match(/WB\d{8,}/)?.[0] ?? '';
+  return { plate, waybill };
+}
+
+function getVehicleLocationDemo(plate: string): VehicleLocationDemo {
+  if (plate === '皖K55821') {
+    return {
+      poi: '南京绕城高速·六合枢纽西南侧 1.2km',
+      direction: '东北方向（42°）',
+      lastLocationTime: '2026-08-03 16:39:52',
+      speed: '72 km/h',
+      latitude: '32.286842',
+      longitude: '118.823517',
+    };
+  }
+  return {
+    poi: 'G60 沪昆高速·嘉兴服务区东侧 2.4km',
+    direction: '正东方向（88°）',
+    lastLocationTime: '2026-08-03 16:42:18',
+    speed: '68 km/h',
+    latitude: '30.768421',
+    longitude: '120.684295',
+  };
+}
+
+function createVehicleLocationProcessMessage(plate: string, waybill: string, location: VehicleLocationDemo): ChatMessage {
+  const queryObject = waybill ? `${waybill}（关联车辆 ${plate}）` : plate;
+  return {
+    role: 'agent',
+    title: '车辆定位与轨迹查询',
+    status: '已完成',
+    text: `正在查询 ${queryObject} 的最新定位与行驶轨迹。`,
+    progressMode: true,
+    steps: [
+      { title: '识别查询对象', text: `已识别查询对象：${queryObject}。` },
+      { title: '查询车辆定位', text: '获取车辆最新经纬度、POI、速度、航向和定位时间。', skill: '车辆定位查询' },
+      { title: '查询行驶轨迹', text: '核验最近行驶轨迹、道路匹配结果和定位连续性。', skill: '轨迹查询' },
+      { title: '生成定位结果', text: '汇总当前位置与轨迹核验结果，生成车辆定位 H5 页面。' },
+    ],
+    result: `车辆：${plate}\n当前位置：${location.poi}\n航向：${location.direction} · 速度：${location.speed}\n最后定位时间：${location.lastLocationTime}\n经纬度：${location.latitude}, ${location.longitude}\n轨迹状态：定位连续，当前沿计划道路正常行驶。`,
+    link: {
+      label: `查看 ${plate} 车辆定位的 H5 页面`,
+      title: `${plate} 车辆定位`,
+      url: 'https://www.sinoiov.com/',
+    },
+  };
+}
+
 function formatFileTimestamp(date: Date) {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
@@ -322,6 +388,8 @@ export const agentWorkData = defineStore('agentWork', {
         { role: 'agent', text: '发现 2 单非目的地物流园长停、1 单 GPS 轨迹疑似造假，建议优先复核。' },
       ] as ChatMessage[],
       rightPanel: 'overview',
+      externalH5Title: '',
+      externalH5Url: '',
       ordersRiskFilter: '全部',
       ordersStatusFilter: '全部',
       ordersKeyword: '',
@@ -365,7 +433,7 @@ export const agentWorkData = defineStore('agentWork', {
       return summarizeOrders(this.riskOrdersFiltered);
     },
     visibleRightPanel(state): string {
-      return ['overview', 'risk', 'orderEvent'].includes(state.rightPanel) ? state.rightPanel : 'overview';
+      return ['overview', 'risk', 'orderEvent', 'externalH5'].includes(state.rightPanel) ? state.rightPanel : 'overview';
     },
     timelineEvents(state): TimelineEvent[] {
       if (state.detailOnlyAbnormal) return timelineSeed.filter((e) => e.type !== 'normal');
@@ -387,6 +455,14 @@ export const agentWorkData = defineStore('agentWork', {
     },
   },
   actions: {
+    openExternalH5(url: string, title: string) {
+      this.externalH5Url = url;
+      this.externalH5Title = title;
+      this.rightPanel = 'externalH5';
+    },
+    showDefaultRightPanel() {
+      this.rightPanel = 'overview';
+    },
     setSelectedOrder(order: Order) {
       this.selectedOrder = order;
     },
@@ -503,6 +579,7 @@ export const agentWorkData = defineStore('agentWork', {
       const next: ChatMessage[] = [...this.agentMessages, { role: 'user', text: raw }];
       const spreadsheetRequest = extractSpreadsheetRequest(raw);
       const mcpPrompt = extractMcpPrompt(raw);
+      const vehicleLocationRequest = extractVehicleLocationRequest(raw);
       let replyMessage: ChatMessage = { role: 'agent', text: '已处理你的请求。结果已显示在右侧面板。' };
       if (spreadsheetRequest) {
         this.startSpreadsheetFillProcess(next, spreadsheetRequest.sourceFileName);
@@ -511,6 +588,19 @@ export const agentWorkData = defineStore('agentWork', {
       }
       if (mcpPrompt) {
         await this.startMcpPromptTest(next, mcpPrompt);
+        this.agentInput = '';
+        return;
+      }
+      if (vehicleLocationRequest) {
+        const matchedOrder = vehicleLocationRequest.waybill
+          ? this.ordersSeed.find((order) => order.id.toUpperCase() === vehicleLocationRequest.waybill)
+          : undefined;
+        const plate = vehicleLocationRequest.plate || matchedOrder?.plate || '沪A12345';
+        const location = getVehicleLocationDemo(plate);
+        const processMessage = createVehicleLocationProcessMessage(plate, vehicleLocationRequest.waybill, location);
+        this.startDelayedAgentProcess(next, processMessage, () => {
+          this.openExternalH5(processMessage.link!.url, processMessage.link!.title);
+        });
         this.agentInput = '';
         return;
       }
@@ -602,8 +692,10 @@ export const agentWorkData = defineStore('agentWork', {
         {
           ...finalMessage,
           status: '处理中',
-          steps: [],
+          steps: finalMessage.progressMode ? steps : [],
+          activeStepIndex: 0,
           result: '',
+          link: undefined,
         },
       ];
 
@@ -615,8 +707,10 @@ export const agentWorkData = defineStore('agentWork', {
             return {
               ...message,
               status: isComplete ? '已完成' : '处理中',
-              steps: steps.slice(0, stepIndex + 1),
+              steps: finalMessage.progressMode ? steps : steps.slice(0, stepIndex + 1),
+              activeStepIndex: isComplete ? steps.length : stepIndex,
               result: isComplete ? finalMessage.result : '',
+              link: isComplete ? finalMessage.link : undefined,
             };
           });
 

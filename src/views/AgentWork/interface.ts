@@ -52,12 +52,19 @@ export interface ChatMessage {
   result?: string;
   activeStepIndex?: number;
   file?: AgentResultFile;
+  link?: AgentResultLink;
   progressMode?: boolean;
   steps?: {
     title: string;
     text: string;
     skill?: string;
   }[];
+}
+
+export interface AgentResultLink {
+  label: string;
+  title: string;
+  url: string;
 }
 
 export interface AgentResultFile {

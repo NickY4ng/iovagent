@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { ChatMessage, TimelineEvent } from '../interface';
+import type { AgentResultLink, ChatMessage, TimelineEvent } from '../interface';
 import type { LatLngExpression, LatLngTuple } from 'leaflet';
 
 import L from 'leaflet';
@@ -75,6 +75,23 @@ let fileDragDepth = 0;
 
 function setRightPanel(key: string) {
   store.rightPanel = key;
+}
+
+function toggleRightPanelVisibility() {
+  isRightPanelVisible.value = !isRightPanelVisible.value;
+}
+
+function closeRightPanelContent() {
+  if (store.visibleRightPanel === 'externalH5') {
+    store.showDefaultRightPanel();
+    return;
+  }
+  isRightPanelVisible.value = false;
+}
+
+function openAgentResultLink(link: AgentResultLink) {
+  store.openExternalH5(link.url, link.title);
+  isRightPanelVisible.value = true;
 }
 
 function selectAgentModel(option: AgentModelOption) {
@@ -165,6 +182,13 @@ function scrollAgentMessagesToBottom() {
 
 const isOrderEventPanel = computed(() => store.visibleRightPanel === 'orderEvent');
 const isDefaultOverview = computed(() => store.visibleRightPanel === 'overview');
+const isExternalH5Panel = computed(() => store.visibleRightPanel === 'externalH5');
+const rightPanelTitle = computed(() => {
+  if (isExternalH5Panel.value) return store.externalH5Title || '外部 H5 页面';
+  if (isOrderEventPanel.value) return '只看皖K55821异常停车事件';
+  if (isDefaultOverview.value) return '今日在途情况';
+  return '今日在途预警处理结果';
+});
 const agentGridClass = computed(() => (isRightPanelVisible.value ? 'grid-cols-[minmax(0,1fr)_minmax(380px,0.96fr)]' : 'grid-cols-1'));
 const visibleQuickPrompts = computed(() => quickPrompts.slice(0, 3));
 
@@ -422,6 +446,11 @@ watch(
 watch(
   () => store.visibleRightPanel,
   (panel) => {
+    if (panel === 'externalH5') {
+      isRightPanelVisible.value = true;
+      clearEventPanelMap();
+      return;
+    }
     if (panel === 'orderEvent') {
       initEventPanelMap();
       return;
@@ -452,7 +481,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="inline-flex items-center gap-1 rounded-md border border-[#deded9] bg-[#f7f7f5] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-950"
-          @click="isRightPanelVisible = !isRightPanelVisible"
+          @click="toggleRightPanelVisibility"
         >
           <Icon :svg="strokeIconPaths.chevron" :size="13" :svg-class="isRightPanelVisible ? 'rotate-180' : ''" />
           {{ isRightPanelVisible ? '隐藏右栏' : '显示右栏' }}
@@ -519,9 +548,24 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </div>
-              <div v-if="m.result" class="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-medium leading-5 text-blue-700">
+              <div v-if="m.result" class="mt-3 whitespace-pre-line rounded-md bg-blue-50 px-3 py-2 text-xs font-medium leading-5 text-blue-700">
                 {{ m.result }}
               </div>
+              <a
+                v-if="m.link"
+                :href="m.link.url"
+                class="mt-3 flex w-full items-center gap-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-100/70"
+                @click.prevent="openAgentResultLink(m.link)"
+              >
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-blue-700 shadow-sm">
+                  <Icon :svg="strokeIconPaths.locate" :size="18" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-slate-900">{{ m.link.label }}</span>
+                  <span class="mt-0.5 block truncate text-xs text-slate-500">{{ m.link.url }}</span>
+                </span>
+                <Icon :svg="strokeIconPaths.chevron" :size="16" svg-class="shrink-0 text-blue-700" />
+              </a>
               <a
                 v-if="m.file"
                 class="mt-3 flex w-full items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100/70"
@@ -675,13 +719,37 @@ onBeforeUnmount(() => {
 
     <div v-if="isRightPanelVisible" class="flex h-full flex-col overflow-hidden border-l border-[#eeeeec] bg-white">
       <div class="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-[#eeeeec] bg-white px-4">
-        <div>
-          <h2 class="text-sm font-semibold leading-5 text-slate-950">
-            {{ isOrderEventPanel ? '只看皖K55821异常停车事件' : isDefaultOverview ? '今日在途情况' : '今日在途预警处理结果' }}
-          </h2>
+        <div class="min-w-0">
+          <h2 class="truncate text-sm font-semibold leading-5 text-slate-950">{{ rightPanelTitle }}</h2>
         </div>
-        <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('green')">实时同步</span>
+        <div class="flex shrink-0 items-center gap-2">
+          <span v-if="!isExternalH5Panel" class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('green')">实时同步</span>
+          <span v-else class="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">外部 H5</span>
+          <button
+            type="button"
+            class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-[#f2f2ef] hover:text-slate-800"
+            :aria-label="isExternalH5Panel ? '关闭外部 H5 页面' : '关闭右侧栏'"
+            :title="isExternalH5Panel ? '关闭页面并返回默认看板' : '隐藏右侧栏'"
+            @click="closeRightPanelContent"
+          >
+            <Icon :svg="strokeIconPaths.x" :size="15" />
+          </button>
+        </div>
       </div>
+      <div v-if="isExternalH5Panel" class="flex min-h-0 flex-1 flex-col bg-white">
+        <div class="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-[#eeeeec] bg-[#f7f7f5] px-3 text-xs text-slate-500">
+          <span class="min-w-0 truncate font-mono">{{ store.externalH5Url }}</span>
+          <a :href="store.externalH5Url" target="_blank" rel="noreferrer" class="shrink-0 font-medium text-slate-700 hover:text-slate-950">新窗口打开</a>
+        </div>
+        <iframe
+          :key="store.externalH5Url"
+          :src="store.externalH5Url"
+          :title="store.externalH5Title || '外部 H5 页面'"
+          class="min-h-0 w-full flex-1 border-0 bg-white"
+          referrerpolicy="no-referrer-when-downgrade"
+        />
+      </div>
+      <template v-else>
       <div v-if="isDefaultOverview" class="border-b border-[#e2e2dc] p-4">
         <div class="grid grid-cols-4 gap-3">
           <div class="rounded-md bg-[#f7f7f5] p-3">
@@ -926,6 +994,7 @@ onBeforeUnmount(() => {
         </div>
 
       </div>
+      </template>
     </div>
   </div>
 </template>
