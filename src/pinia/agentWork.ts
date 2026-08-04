@@ -357,6 +357,69 @@ function createVehicleLocationProcessMessage(plate: string, waybill: string, loc
   };
 }
 
+interface AnalysisReportRequest {
+  prompt: string;
+  title: string;
+  topic: string;
+}
+
+const analysisReportGenerationTerms = ['生成', '输出', '制作', '创建', '形成', '整理', '产出', '做一份', '做一个', '做个', '出一份', '出一个', '出个', '给我一份'];
+const analysisReportIntentTerms = ['分析报告', '经营报告', '运营报告', '统计报告', '数据报告', '专题报告'];
+const analysisReportDomainTerms = ['分析', '统计', '经营', '运营', '异常', '风险', '预警', '运单', '物流', '承运商', '时效', '轨迹', '停车', '复盘', '洞察'];
+
+function resolveAnalysisReportTopic(prompt: string) {
+  if (/(GPS|轨迹|定位真实性|造假)/i.test(prompt)) return '车辆轨迹真实性';
+  if (/(停车|停留|长停)/.test(prompt)) return '异常停车风险';
+  if (/(承运商|承运单位|物流商)/.test(prompt)) return '承运商履约';
+  if (/(时效|到货|晚到|预计到达|ETA)/i.test(prompt)) return '在途运输时效';
+  if (/(异常|风险|预警)/.test(prompt)) return '今日在途异常风险';
+  if (/(运单|在途|运输)/.test(prompt)) return '在途运单运营';
+  return '物流经营综合';
+}
+
+function extractAnalysisReportRequest(raw: string): AnalysisReportRequest | null {
+  const prompt = raw.trim();
+  const compactPrompt = prompt.replace(/\s+/g, '');
+  const hasGenerationAction = analysisReportGenerationTerms.some((term) => compactPrompt.includes(term));
+  const hasNamedReportIntent = analysisReportIntentTerms.some((term) => compactPrompt.includes(term));
+  const hasReportWithDomain = compactPrompt.includes('报告') && analysisReportDomainTerms.some((term) => compactPrompt.includes(term));
+  const hasImpliedReport = analysisReportDomainTerms.some((term) => compactPrompt.includes(term)) && /(?:给我一份|做一份|做一个|做个|出一份|出一个|出个)/.test(compactPrompt);
+  if (!hasGenerationAction || (!hasNamedReportIntent && !hasReportWithDomain && !hasImpliedReport)) return null;
+
+  const topic = resolveAnalysisReportTopic(compactPrompt);
+  return {
+    prompt,
+    topic,
+    title: `${topic}分析报告`,
+  };
+}
+
+function createAnalysisReportProcessMessage(request: AnalysisReportRequest): ChatMessage {
+  return {
+    role: 'agent',
+    title: '经营分析报告生成',
+    status: '已完成',
+    text: `正在围绕“${request.topic}”构建经营分析报告。`,
+    progressMode: true,
+    steps: [
+      { title: '识别分析问题', text: `识别分析主题、统计周期和核心指标：${request.topic}。` },
+      { title: '汇聚经营数据', text: '读取在途运单、车辆定位、轨迹、承运商及风险事件数据。', skill: '大卡鹰眼' },
+      { title: '执行经营分析', text: '统一指标口径，分析趋势、风险构成、线路与承运商表现。', skill: '经营分析参谋' },
+      { title: '生成可视化报告', text: '生成指标卡、趋势图、风险分布、排名明细和经营建议。', skill: '经营分析参谋' },
+    ],
+    result: `已完成《${request.title}》。大卡鹰眼汇聚 128 单在途运单及相关轨迹、风险事件，经营分析参谋识别出 17 单异常和 6 单高风险运单。`,
+    link: {
+      kind: 'analysisReport',
+      label: `查看《${request.title}》`,
+      prompt: request.prompt,
+      title: request.title,
+      topic: request.topic,
+      description: '经营分析参谋 · 大卡鹰眼生成',
+      url: '#analysis-report',
+    },
+  };
+}
+
 function formatFileTimestamp(date: Date) {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
@@ -416,6 +479,9 @@ export const agentWorkData = defineStore('agentWork', {
       rightPanel: 'overview',
       externalH5Title: '',
       externalH5Url: '',
+      analysisReportPrompt: '',
+      analysisReportTitle: '',
+      analysisReportTopic: '',
       ordersRiskFilter: '全部',
       ordersStatusFilter: '全部',
       ordersKeyword: '',
@@ -459,7 +525,7 @@ export const agentWorkData = defineStore('agentWork', {
       return summarizeOrders(this.riskOrdersFiltered);
     },
     visibleRightPanel(state): string {
-      return ['overview', 'risk', 'orderEvent', 'externalH5'].includes(state.rightPanel) ? state.rightPanel : 'overview';
+      return ['overview', 'risk', 'orderEvent', 'externalH5', 'analysisReport'].includes(state.rightPanel) ? state.rightPanel : 'overview';
     },
     timelineEvents(state): TimelineEvent[] {
       if (state.detailOnlyAbnormal) return timelineSeed.filter((e) => e.type !== 'normal');
@@ -485,6 +551,12 @@ export const agentWorkData = defineStore('agentWork', {
       this.externalH5Url = url;
       this.externalH5Title = title;
       this.rightPanel = 'externalH5';
+    },
+    openAnalysisReport(title: string, topic: string, prompt: string) {
+      this.analysisReportTitle = title;
+      this.analysisReportTopic = topic;
+      this.analysisReportPrompt = prompt;
+      this.rightPanel = 'analysisReport';
     },
     showDefaultRightPanel() {
       this.rightPanel = 'overview';
@@ -605,6 +677,7 @@ export const agentWorkData = defineStore('agentWork', {
       const next: ChatMessage[] = [...this.agentMessages, { role: 'user', text: raw }];
       const spreadsheetRequest = extractSpreadsheetRequest(raw);
       const mcpPrompt = extractMcpPrompt(raw);
+      const analysisReportRequest = extractAnalysisReportRequest(raw);
       const vehicleLocationRequest = extractVehicleLocationRequest(raw);
       let replyMessage: ChatMessage = { role: 'agent', text: '已处理你的请求。结果已显示在右侧面板。' };
       if (spreadsheetRequest) {
@@ -614,6 +687,14 @@ export const agentWorkData = defineStore('agentWork', {
       }
       if (mcpPrompt) {
         await this.startMcpPromptTest(next, mcpPrompt);
+        this.agentInput = '';
+        return;
+      }
+      if (analysisReportRequest) {
+        const processMessage = createAnalysisReportProcessMessage(analysisReportRequest);
+        this.startDelayedAgentProcess(next, processMessage, () => {
+          this.openAnalysisReport(analysisReportRequest.title, analysisReportRequest.topic, analysisReportRequest.prompt);
+        });
         this.agentInput = '';
         return;
       }

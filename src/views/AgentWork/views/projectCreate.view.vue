@@ -63,13 +63,13 @@ const tabs: { id: SkillTab; label: string }[] = [
   { id: 'all', label: '全部' },
   { id: 'data', label: '数据员工' },
   { id: 'logistics', label: '在途专家' },
-  { id: 'analysis', label: '智数分析专家' },
+  { id: 'analysis', label: '经营分析参谋' },
   { id: 'operations', label: '运营助手' },
   { id: 'capacity', label: '运力与货源' },
 ];
 
 const skillTypeLabels: Record<SkillType, string> = {
-  analysis: '智数分析专家',
+  analysis: '经营分析参谋',
   capacity: '运力与货源',
   data: '数据员工',
   logistics: '在途专家',

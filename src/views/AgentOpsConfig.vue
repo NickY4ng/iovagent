@@ -9,7 +9,7 @@ import { strokeIconPaths } from './AgentWork/strokeIconPaths';
 
 type ConfigTab = 'dataset' | 'employees' | 'skills';
 type LoginType = '短信验证码' | '手机扫码' | '图形验证码' | '无验证';
-type SkillCategory = '在途专家' | '智数分析专家' | '运营助手' | '运力与货源';
+type SkillCategory = '在途专家' | '经营分析参谋' | '运营助手' | '运力与货源';
 type SkillManagementTab = 'skills' | 'systemPrompt';
 type SkillVisibility = '全部企业' | '指定企业';
 
@@ -353,7 +353,7 @@ const skillManagementTabs: { id: SkillManagementTab; label: string }[] = [
   { id: 'skills', label: 'Skill 列表' },
   { id: 'systemPrompt', label: 'System Prompt 管理' },
 ];
-const skillCategoryOptions: Array<'全部' | SkillCategory> = ['全部', '在途专家', '智数分析专家', '运营助手', '运力与货源'];
+const skillCategoryOptions: Array<'全部' | SkillCategory> = ['全部', '在途专家', '经营分析参谋', '运营助手', '运力与货源'];
 const skillVisibilityOptions: SkillVisibility[] = ['全部企业', '指定企业'];
 
 const waybillFields: WaybillField[] = [

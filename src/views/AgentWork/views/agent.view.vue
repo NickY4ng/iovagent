@@ -14,6 +14,7 @@ import { agentWorkData, quickPrompts, rightPanelTabs } from '@/pinia/agentWork';
 import { getRiskOrders, badgeToneClass } from '../utils';
 import { strokeIconPaths } from '../strokeIconPaths';
 import { useAgentWorkNav } from '../useAgentWorkNav';
+import AnalysisReportView from './analysisReport.view.vue';
 
 const store = agentWorkData();
 const { agentMessages, agentInput } = storeToRefs(store);
@@ -82,7 +83,7 @@ function toggleRightPanelVisibility() {
 }
 
 function closeRightPanelContent() {
-  if (store.visibleRightPanel === 'externalH5') {
+  if (store.visibleRightPanel === 'externalH5' || store.visibleRightPanel === 'analysisReport') {
     store.showDefaultRightPanel();
     return;
   }
@@ -90,7 +91,11 @@ function closeRightPanelContent() {
 }
 
 function openAgentResultLink(link: AgentResultLink) {
-  store.openExternalH5(link.url, link.title);
+  if (link.kind === 'analysisReport') {
+    store.openAnalysisReport(link.title, link.topic ?? link.title, link.prompt ?? link.label);
+  } else {
+    store.openExternalH5(link.url, link.title);
+  }
   isRightPanelVisible.value = true;
 }
 
@@ -183,7 +188,9 @@ function scrollAgentMessagesToBottom() {
 const isOrderEventPanel = computed(() => store.visibleRightPanel === 'orderEvent');
 const isDefaultOverview = computed(() => store.visibleRightPanel === 'overview');
 const isExternalH5Panel = computed(() => store.visibleRightPanel === 'externalH5');
+const isAnalysisReportPanel = computed(() => store.visibleRightPanel === 'analysisReport');
 const rightPanelTitle = computed(() => {
+  if (isAnalysisReportPanel.value) return store.analysisReportTitle || '经营分析报告';
   if (isExternalH5Panel.value) return store.externalH5Title || '外部 H5 页面';
   if (isOrderEventPanel.value) return '只看皖K55821异常停车事件';
   if (isDefaultOverview.value) return '今日在途情况';
@@ -446,7 +453,7 @@ watch(
 watch(
   () => store.visibleRightPanel,
   (panel) => {
-    if (panel === 'externalH5') {
+    if (panel === 'externalH5' || panel === 'analysisReport') {
       isRightPanelVisible.value = true;
       clearEventPanelMap();
       return;
@@ -558,11 +565,11 @@ onBeforeUnmount(() => {
                 @click.prevent="openAgentResultLink(m.link)"
               >
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-blue-700 shadow-sm">
-                  <Icon :svg="strokeIconPaths.locate" :size="18" />
+                  <Icon :svg="m.link.kind === 'analysisReport' ? strokeIconPaths.gauge : strokeIconPaths.locate" :size="18" />
                 </span>
                 <span class="min-w-0 flex-1">
                   <span class="block truncate text-sm font-medium text-slate-900">{{ m.link.label }}</span>
-                  <span class="mt-0.5 block truncate text-xs text-slate-500">{{ m.link.url }}</span>
+                  <span class="mt-0.5 block truncate text-xs text-slate-500">{{ m.link.description ?? m.link.url }}</span>
                 </span>
                 <Icon :svg="strokeIconPaths.chevron" :size="16" svg-class="shrink-0 text-blue-700" />
               </a>
@@ -723,24 +730,35 @@ onBeforeUnmount(() => {
           <h2 class="truncate text-sm font-semibold leading-5 text-slate-950">{{ rightPanelTitle }}</h2>
         </div>
         <div class="flex shrink-0 items-center gap-2">
-          <span v-if="!isExternalH5Panel" class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('green')">实时同步</span>
-          <span v-else class="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">外部 H5</span>
+          <span v-if="!isExternalH5Panel && !isAnalysisReportPanel" class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('green')">实时同步</span>
+          <a
+            v-else-if="isExternalH5Panel"
+            :href="store.externalH5Url"
+            target="_blank"
+            rel="noreferrer"
+            class="inline-flex h-7 items-center rounded-md border border-[#deded9] bg-[#f7f7f5] px-2.5 text-xs font-medium text-slate-600 transition hover:bg-white hover:text-slate-950"
+          >
+            新窗口打开
+          </a>
           <button
             type="button"
             class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-[#f2f2ef] hover:text-slate-800"
-            :aria-label="isExternalH5Panel ? '关闭外部 H5 页面' : '关闭右侧栏'"
-            :title="isExternalH5Panel ? '关闭页面并返回默认看板' : '隐藏右侧栏'"
+            :aria-label="isExternalH5Panel ? '关闭外部 H5 页面' : isAnalysisReportPanel ? '关闭分析报告' : '关闭右侧栏'"
+            :title="isExternalH5Panel || isAnalysisReportPanel ? '关闭页面并返回默认看板' : '隐藏右侧栏'"
             @click="closeRightPanelContent"
           >
             <Icon :svg="strokeIconPaths.x" :size="15" />
           </button>
         </div>
       </div>
-      <div v-if="isExternalH5Panel" class="flex min-h-0 flex-1 flex-col bg-white">
-        <div class="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-[#eeeeec] bg-[#f7f7f5] px-3 text-xs text-slate-500">
-          <span class="min-w-0 truncate font-mono">{{ store.externalH5Url }}</span>
-          <a :href="store.externalH5Url" target="_blank" rel="noreferrer" class="shrink-0 font-medium text-slate-700 hover:text-slate-950">新窗口打开</a>
-        </div>
+      <AnalysisReportView
+        v-if="isAnalysisReportPanel"
+        class="min-h-0 flex-1"
+        :prompt="store.analysisReportPrompt"
+        :title="store.analysisReportTitle"
+        :topic="store.analysisReportTopic"
+      />
+      <div v-else-if="isExternalH5Panel" class="flex min-h-0 flex-1 flex-col bg-white">
         <iframe
           :key="store.externalH5Url"
           :src="store.externalH5Url"

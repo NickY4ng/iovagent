@@ -62,8 +62,12 @@ export interface ChatMessage {
 }
 
 export interface AgentResultLink {
+  description?: string;
+  kind?: 'analysisReport' | 'externalH5';
   label: string;
+  prompt?: string;
   title: string;
+  topic?: string;
   url: string;
 }
 
