@@ -11,6 +11,22 @@ export interface Project {
   statusFilter: string;
   skillIds?: string[];
 }
+
+export type TmsSyncCustomerStatus = '已处理' | '未处理';
+
+export interface TmsSyncCustomer {
+  account: string;
+  enterpriseCid: string;
+  id: string;
+  password: string;
+  processedAt?: string;
+  processedBy?: string;
+  status: TmsSyncCustomerStatus;
+  submittedAt: string;
+  systemUrl: string;
+  userPhone: string;
+}
+
 export type PageId = 'agent' | 'analytics' | 'detail' | 'downloads' | 'longTasks' | 'orders' | 'projectCreate' | 'projects' | 'risk';
 export type Tone = 'blue' | 'gray' | 'green' | 'orange' | 'purple' | 'red';
 

@@ -46,12 +46,14 @@ const selectedOperationsSkillIds = ref<string[]>([]);
 const selectedCapacitySkillIds = ref<string[]>([]);
 const selectedAnalysisSkillIds = ref<string[]>([]);
 const authorizedSkillIds = ref<string[]>([]);
+const connectingSkillExpectedTimes = ref<Record<string, string>>({});
 const pendingLoginSkill = ref<ProjectSkill | null>(null);
 const loginAgentStatus = ref<LoginAgentStatus>('idle');
 const loginAgentMessages = ref<LoginAgentMessage[]>([]);
 const loginVerificationCode = ref('');
 const loginLogRef = ref<HTMLDivElement | null>(null);
 const loginForm = reactive({
+  systemAddress: '',
   username: '',
   password: '',
 });
@@ -306,6 +308,7 @@ const loginConfirmText = computed(() => {
   return '确认';
 });
 const isLoginFormLocked = computed(() => loginAgentStatus.value !== 'idle');
+const isPendingTmsSyncEmployee = computed(() => pendingLoginSkill.value?.id === 'tms-sync-employee');
 
 function getProjectSkillIds() {
   const project = editingProject.value;
@@ -358,6 +361,14 @@ function isSkillSelected(skill: ProjectSkill) {
   return selectedCapacitySkillIds.value.includes(skill.id);
 }
 
+function isSkillConnecting(skill: ProjectSkill) {
+  return Boolean(connectingSkillExpectedTimes.value[skill.id]);
+}
+
+function getSkillExpectedTime(skill: ProjectSkill) {
+  return connectingSkillExpectedTimes.value[skill.id] ?? '';
+}
+
 function skillAvatarClass(skill: ProjectSkill) {
   if (skill.type === 'data') return 'bg-[#eef6f1] text-emerald-700';
   if (skill.type === 'operations') return 'bg-[#edf6f7] text-cyan-700';
@@ -367,6 +378,7 @@ function skillAvatarClass(skill: ProjectSkill) {
 }
 
 function toggleSkill(skill: ProjectSkill) {
+  if (isSkillConnecting(skill)) return;
   if (skill.type === 'data') {
     if (selectedDataSkillId.value === skill.id) {
       selectedDataSkillId.value = '';
@@ -375,6 +387,7 @@ function toggleSkill(skill: ProjectSkill) {
     if (skill.usage === '需登录' && !authorizedSkillIds.value.includes(skill.id)) {
       pendingLoginSkill.value = skill;
       resetLoginAgentState();
+      loginForm.systemAddress = '';
       loginForm.username = '';
       loginForm.password = '';
       return;
@@ -476,6 +489,37 @@ function finishSkillLogin() {
   ElMessage.success('数据员工登录验证完成');
 }
 
+function formatExpectedConnectionTime() {
+  const expectedAt = new Date(Date.now() + 30 * 60 * 1000);
+  return `${String(expectedAt.getHours()).padStart(2, '0')}:${String(expectedAt.getMinutes()).padStart(2, '0')}`;
+}
+
+function startTmsInitialConnection() {
+  if (!pendingLoginSkill.value) return;
+  const skillId = pendingLoginSkill.value.id;
+  const projectNumber = store.currentProjectId.replace(/\D/g, '') || '1';
+  const loginUser = window.localStorage.getItem('iovagent_login_user')?.trim() ?? '';
+  store.submitTmsSyncCustomer({
+    enterpriseCid: `CID${projectNumber.padStart(8, '0')}`,
+    userPhone: /^1\d{10}$/.test(loginUser) ? loginUser : '13800138000',
+    systemUrl: loginForm.systemAddress,
+    account: loginForm.username,
+    password: loginForm.password,
+  });
+  connectingSkillExpectedTimes.value = {
+    ...connectingSkillExpectedTimes.value,
+    [skillId]: formatExpectedConnectionTime(),
+  };
+  authorizedSkillIds.value = Array.from(new Set([...authorizedSkillIds.value, skillId]));
+  selectedDataSkillId.value = skillId;
+  pendingLoginSkill.value = null;
+  resetLoginAgentState();
+  loginForm.systemAddress = '';
+  loginForm.username = '';
+  loginForm.password = '';
+  ElMessage.success('TMS同步员工已开始初次连接');
+}
+
 function confirmSkillLogin() {
   if (!pendingLoginSkill.value) return;
   if (loginAgentStatus.value === 'complete') {
@@ -483,8 +527,16 @@ function confirmSkillLogin() {
     return;
   }
   if (loginAgentStatus.value !== 'idle') return;
+  if (isPendingTmsSyncEmployee.value && !loginForm.systemAddress.trim()) {
+    ElMessage.warning('请填写需要连接的系统地址');
+    return;
+  }
   if (!loginForm.username.trim() || !loginForm.password.trim()) {
     ElMessage.warning('请填写用户名和密码');
+    return;
+  }
+  if (isPendingTmsSyncEmployee.value) {
+    startTmsInitialConnection();
     return;
   }
   startSkillLoginAgent();
@@ -493,6 +545,7 @@ function confirmSkillLogin() {
 function cancelSkillLogin() {
   resetLoginAgentState();
   pendingLoginSkill.value = null;
+  loginForm.systemAddress = '';
   loginForm.username = '';
   loginForm.password = '';
 }
@@ -617,10 +670,13 @@ onBeforeUnmount(() => {
             type="button"
             class="group flex min-h-[172px] flex-col rounded-lg border bg-white p-4 text-left shadow-sm transition"
             :class="
-              isSkillSelected(skill)
+              isSkillConnecting(skill)
+                ? 'cursor-wait border-[#deded9] bg-[#fafaf8] opacity-80 shadow-none'
+                : isSkillSelected(skill)
                 ? 'border-slate-900 shadow-[0_0_0_1px_rgba(15,23,42,0.85),0_10px_22px_rgba(15,23,42,0.08)]'
                 : 'border-transparent hover:border-[#deded9] hover:shadow-md'
             "
+            :disabled="isSkillConnecting(skill)"
             @click="toggleSkill(skill)"
           >
             <div class="flex items-start justify-between gap-3">
@@ -634,6 +690,7 @@ onBeforeUnmount(() => {
                 </span>
               </div>
               <span
+                v-if="!isSkillConnecting(skill)"
                 class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border"
                 :class="isSkillSelected(skill) ? 'border-slate-900 bg-slate-900 text-white' : 'border-[#deded9] text-transparent group-hover:text-slate-300'"
               >
@@ -643,7 +700,12 @@ onBeforeUnmount(() => {
 
             <p class="mt-4 line-clamp-2 flex-1 text-xs leading-6 text-slate-600">{{ skill.description }}</p>
 
-            <div class="mt-3 flex flex-wrap items-center gap-2">
+            <div v-if="isSkillConnecting(skill)" class="mt-3 flex min-h-6 items-center gap-1.5 text-[11px] font-medium leading-4 text-slate-500">
+              <Icon :svg="strokeIconPaths.refresh" :size="13" svg-class="shrink-0 animate-spin text-slate-400" />
+              <span>初次连接中...预计智能体解析在{{ getSkillExpectedTime(skill) }}完成</span>
+            </div>
+
+            <div v-else class="mt-3 flex flex-wrap items-center gap-2">
               <span class="rounded-md bg-[#f1f1ef] px-2 py-1 text-xs leading-4 text-slate-600">
                 {{ skillTypeLabels[skill.type] }}
               </span>
@@ -697,6 +759,16 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <div class="space-y-4 px-4 py-4">
+          <label v-if="isPendingTmsSyncEmployee" class="block">
+            <span class="mb-1.5 block text-xs font-medium text-slate-600">需要连接的系统地址：</span>
+            <input
+              v-model.trim="loginForm.systemAddress"
+              :disabled="isLoginFormLocked"
+              type="url"
+              class="h-10 w-full rounded-md border border-[#deded9] bg-[#fbfbfa] px-3 text-sm outline-none focus:border-slate-400 disabled:cursor-not-allowed disabled:text-slate-400"
+              placeholder="请输入 TMS 系统登录地址"
+            />
+          </label>
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="block">
               <span class="mb-1.5 block text-xs font-medium text-slate-600">用户名</span>
@@ -720,7 +792,16 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="flex items-center justify-between gap-3">
-            <div class="min-w-0 text-xs leading-5 text-slate-500">
+            <div v-if="isPendingTmsSyncEmployee" class="min-w-0 text-xs leading-5 text-slate-500">
+              大卡数字人将会加密存储您提供的账密，并提供
+              <a
+                href="/legal/information-protection-commitment.html"
+                target="_blank"
+                rel="noreferrer"
+                class="font-medium text-blue-600 hover:text-blue-700 hover:underline"
+              >信息保护承诺书</a>
+            </div>
+            <div v-else class="min-w-0 text-xs leading-5 text-slate-500">
               Agent 将使用 Playwright 自动打开目标系统并完成登录。
             </div>
             <div class="flex shrink-0 items-center gap-2">

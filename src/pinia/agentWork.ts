@@ -1,4 +1,4 @@
-import type { AgentResultFile, ChatMessage, DownloadTask, Order, PageId, Project, TimelineEvent } from '@/views/AgentWork/interface';
+import type { AgentResultFile, ChatMessage, DownloadTask, Order, PageId, Project, TimelineEvent, TmsSyncCustomer } from '@/views/AgentWork/interface';
 
 import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
@@ -56,6 +56,58 @@ const projectsSeed: Project[] = [
     skillIds: ['zhilian-shunda-tms', 'route-risk-expert', 'gps-trace-expert'],
   },
 ];
+
+const tmsSyncCustomerStorageKey = 'iovagent_tms_sync_customers';
+const tmsSyncCustomersSeed: TmsSyncCustomer[] = [
+  {
+    id: 'TMSC20260812001',
+    enterpriseCid: 'CID00000186',
+    userPhone: '13800138000',
+    systemUrl: 'https://tms.huadong.example.com/login',
+    account: 'huadong_ops',
+    password: 'Hdtms@2026',
+    status: '未处理',
+    submittedAt: '2026-08-12 10:24',
+  },
+  {
+    id: 'TMSC20260811002',
+    enterpriseCid: 'CID00000193',
+    userPhone: '13900139000',
+    systemUrl: 'https://tms.coldchain.example.com/login',
+    account: 'cold_ops',
+    password: 'Cold@2026',
+    status: '已处理',
+    submittedAt: '2026-08-11 16:42',
+    processedBy: '王运营',
+    processedAt: '2026-08-11 17:05',
+  },
+];
+
+function loadTmsSyncCustomers() {
+  if (typeof window === 'undefined') return [...tmsSyncCustomersSeed];
+  try {
+    const saved = window.localStorage.getItem(tmsSyncCustomerStorageKey);
+    if (!saved) return [...tmsSyncCustomersSeed];
+    const parsed = JSON.parse(saved) as TmsSyncCustomer[];
+    return Array.isArray(parsed) ? parsed : [...tmsSyncCustomersSeed];
+  } catch {
+    return [...tmsSyncCustomersSeed];
+  }
+}
+
+function persistTmsSyncCustomers(customers: TmsSyncCustomer[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(tmsSyncCustomerStorageKey, JSON.stringify(customers));
+}
+
+function formatTmsSyncCustomerTime(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
 
 const ordersSeedData: Order[] = [
   {
@@ -467,6 +519,7 @@ export const agentWorkData = defineStore('agentWork', {
       ordersStartDate: defaultOrdersDateRange.start,
       ordersEndDate: defaultOrdersDateRange.end,
       projects: [...projectsSeed] as Project[],
+      tmsSyncCustomers: loadTmsSyncCustomers(),
       currentProjectId: projectsSeed[0]!.id,
       showProjectModal: false,
       downloadTask: null as DownloadTask | null,
@@ -495,6 +548,9 @@ export const agentWorkData = defineStore('agentWork', {
     };
   },
   getters: {
+    unprocessedTmsSyncCustomerCount(state): number {
+      return state.tmsSyncCustomers.filter((customer) => customer.status === '未处理').length;
+    },
     currentProject(state): Project {
       return state.projects.find((p) => p.id === state.currentProjectId) ?? state.projects[0]!;
     },
@@ -547,6 +603,34 @@ export const agentWorkData = defineStore('agentWork', {
     },
   },
   actions: {
+    submitTmsSyncCustomer(payload: Pick<TmsSyncCustomer, 'account' | 'enterpriseCid' | 'password' | 'systemUrl' | 'userPhone'>) {
+      const now = new Date();
+      this.tmsSyncCustomers = [
+        {
+          ...payload,
+          id: `TMSC${now.getTime()}`,
+          status: '未处理',
+          submittedAt: formatTmsSyncCustomerTime(now),
+        },
+        ...this.tmsSyncCustomers,
+      ];
+      persistTmsSyncCustomers(this.tmsSyncCustomers);
+    },
+    markTmsSyncCustomerProcessed(customerId: string, processedBy: string) {
+      const processedAt = formatTmsSyncCustomerTime();
+      this.tmsSyncCustomers = this.tmsSyncCustomers.map((customer) =>
+        customer.id === customerId
+          ? {
+              ...customer,
+              status: '已处理',
+              processedAt,
+              processedBy,
+            }
+          : customer,
+      );
+      persistTmsSyncCustomers(this.tmsSyncCustomers);
+      ElMessage.success('已标记为已处理');
+    },
     openExternalH5(url: string, title: string) {
       this.externalH5Url = url;
       this.externalH5Title = title;

@@ -5,9 +5,11 @@ import { useRouter } from 'vue-router';
 import { Icon } from '@packages/icon';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
+import { agentWorkData } from '@/pinia/agentWork';
+
 import { strokeIconPaths } from './AgentWork/strokeIconPaths';
 
-type ConfigTab = 'dataset' | 'employees' | 'skills';
+type ConfigTab = 'dataset' | 'employees' | 'skills' | 'tmsCustomers';
 type LoginType = '短信验证码' | '手机扫码' | '图形验证码' | '无验证';
 type SkillCategory = '在途专家' | '经营分析参谋' | '运营助手' | '运力与货源';
 type SkillManagementTab = 'skills' | 'systemPrompt';
@@ -68,6 +70,7 @@ interface SystemPromptConfig {
 }
 
 const router = useRouter();
+const store = agentWorkData();
 const activeTab = ref<ConfigTab>('employees');
 const activeSkillManagementTab = ref<SkillManagementTab>('skills');
 const isCreateEmployeeModalOpen = ref(false);
@@ -78,6 +81,7 @@ const editingEmployeeId = ref('');
 const editingSkillId = ref('');
 const previewingSkill = ref<ManagedSkill | null>(null);
 const validatingEmployee = ref<DataEmployee | null>(null);
+const visibleCustomerPasswordIds = ref<string[]>([]);
 const loginTypes: LoginType[] = ['无验证', '图形验证码', '短信验证码', '手机扫码'];
 const newEmployeeForm = reactive({
   description: '',
@@ -344,11 +348,12 @@ const systemPrompt = ref<SystemPromptConfig>({
 });
 const selectedEmployeeId = ref(dataEmployees.value[0]!.id);
 
-const menuItems: { desc: string; icon: string; id: ConfigTab; label: string }[] = [
+const menuItems = computed<Array<{ badge?: number; desc: string; icon: string; id: ConfigTab; label: string }>>(() => [
   { id: 'employees', label: '数据员工配置', desc: '抓取账号、登录方式、映射 Skill', icon: strokeIconPaths.bot },
+  { id: 'tmsCustomers', label: 'TMS同步客户', desc: '客户提交、连接处理', icon: strokeIconPaths.usersRound, badge: store.unprocessedTmsSyncCustomerCount },
   { id: 'dataset', label: '标准数据集', desc: '运单字段、语义、数据示例', icon: strokeIconPaths.list },
   { id: 'skills', label: 'Skill 管理', desc: '通用技能、可见范围、系统提示词', icon: strokeIconPaths.settings },
-];
+]);
 const skillManagementTabs: { id: SkillManagementTab; label: string }[] = [
   { id: 'skills', label: 'Skill 列表' },
   { id: 'systemPrompt', label: 'System Prompt 管理' },
@@ -858,6 +863,21 @@ async function uploadSystemPrompt(event: Event) {
   input.value = '';
   ElMessage.success('System Prompt 已更新');
 }
+
+function isCustomerPasswordVisible(customerId: string) {
+  return visibleCustomerPasswordIds.value.includes(customerId);
+}
+
+function toggleCustomerPassword(customerId: string) {
+  visibleCustomerPasswordIds.value = isCustomerPasswordVisible(customerId)
+    ? visibleCustomerPasswordIds.value.filter((id) => id !== customerId)
+    : [...visibleCustomerPasswordIds.value, customerId];
+}
+
+function markTmsCustomerProcessed(customerId: string) {
+  const operator = window.localStorage.getItem('iovagent_login_user')?.trim() || '当前运营用户';
+  store.markTmsSyncCustomerProcessed(customerId, operator);
+}
 </script>
 
 <template>
@@ -898,8 +918,17 @@ async function uploadSystemPrompt(event: Event) {
             >
               <Icon :svg="item.icon" :size="15" />
             </span>
-            <span class="min-w-0">
-              <span class="block text-sm font-medium leading-5">{{ item.label }}</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex items-center justify-between gap-2 text-sm font-medium leading-5">
+                <span class="truncate">{{ item.label }}</span>
+                <span
+                  v-if="item.badge"
+                  class="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none"
+                  :class="activeTab === item.id ? 'bg-white text-red-600' : 'bg-red-600 text-white'"
+                >
+                  {{ item.badge > 99 ? '99+' : item.badge }}
+                </span>
+              </span>
               <span class="mt-0.5 block text-xs leading-4" :class="activeTab === item.id ? 'text-white/70' : 'text-slate-400'">
                 {{ item.desc }}
               </span>
@@ -1018,6 +1047,95 @@ async function uploadSystemPrompt(event: Event) {
             </tbody>
           </table>
         </div>
+        </section>
+
+        <section v-else-if="activeTab === 'tmsCustomers'" class="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-[#deded9] bg-white">
+          <div class="flex min-h-14 shrink-0 items-center justify-between gap-4 border-b border-[#e2e2dc] px-4 py-3">
+            <div class="min-w-0">
+              <h2 class="text-sm font-semibold leading-5 text-slate-950">TMS同步客户列表</h2>
+              <p class="mt-1 text-xs leading-4 text-slate-500">记录用户通过“TMS同步员工”提交的系统连接信息。</p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2 text-xs">
+              <span class="rounded-md border border-[#deded9] bg-[#f7f7f5] px-2.5 py-1 text-slate-500">共 {{ store.tmsSyncCustomers.length }} 条</span>
+              <span class="rounded-md border border-red-200 bg-red-50 px-2.5 py-1 font-medium text-red-600">未处理 {{ store.unprocessedTmsSyncCustomerCount }} 条</span>
+            </div>
+          </div>
+
+          <div class="min-h-0 flex-1 overflow-auto">
+            <table class="min-w-[960px] w-full table-fixed border-collapse text-left text-sm">
+              <thead class="sticky top-0 z-10 bg-[#f7f7f5]">
+                <tr class="text-xs font-semibold text-slate-500">
+                  <th class="w-[11%] px-4 py-3">企业 CID</th>
+                  <th class="w-[11%] px-3 py-3">用户手机号</th>
+                  <th class="w-[20%] px-3 py-3">提交系统地址</th>
+                  <th class="w-[10%] px-3 py-3">账号</th>
+                  <th class="w-[11%] px-3 py-3">密码</th>
+                  <th class="w-[9%] px-3 py-3">状态</th>
+                  <th class="w-[13%] px-3 py-3">提交时间</th>
+                  <th class="w-[15%] px-3 py-3">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[#ededea]">
+                <tr v-for="customer in store.tmsSyncCustomers" :key="customer.id" class="bg-white hover:bg-[#f7f7f5]">
+                  <td class="px-4 py-3 align-middle font-mono text-xs font-medium text-slate-800">{{ customer.enterpriseCid }}</td>
+                  <td class="px-3 py-3 align-middle font-mono text-xs text-slate-600">{{ customer.userPhone }}</td>
+                  <td class="px-3 py-3 align-middle">
+                    <a
+                      :href="customer.systemUrl"
+                      target="_blank"
+                      rel="noreferrer"
+                      class="block truncate font-mono text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                      :title="customer.systemUrl"
+                    >
+                      {{ customer.systemUrl }}
+                    </a>
+                  </td>
+                  <td class="px-3 py-3 align-middle font-mono text-xs text-slate-700">{{ customer.account }}</td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-1.5">
+                      <span class="min-w-0 flex-1 truncate font-mono text-xs text-slate-700">
+                        {{ isCustomerPasswordVisible(customer.id) ? customer.password : '••••••••' }}
+                      </span>
+                      <button
+                        type="button"
+                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-slate-700"
+                        :aria-label="isCustomerPasswordVisible(customer.id) ? '隐藏密码' : '显示密码'"
+                        :title="isCustomerPasswordVisible(customer.id) ? '隐藏密码' : '显示密码'"
+                        @click="toggleCustomerPassword(customer.id)"
+                      >
+                        <Icon :svg="strokeIconPaths.eye" :size="14" />
+                      </button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle">
+                    <span
+                      class="inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs font-medium"
+                      :class="customer.status === '未处理' ? 'border-red-200 bg-red-50 text-red-600' : 'border-emerald-200 bg-emerald-50 text-emerald-700'"
+                    >
+                      {{ customer.status }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-3 align-middle whitespace-nowrap text-xs text-slate-500">{{ customer.submittedAt }}</td>
+                  <td class="px-3 py-3 align-middle">
+                    <button
+                      v-if="customer.status === '未处理'"
+                      type="button"
+                      class="h-8 whitespace-nowrap rounded-md bg-slate-900 px-3 text-xs font-medium text-white hover:bg-slate-800"
+                      @click="markTmsCustomerProcessed(customer.id)"
+                    >
+                      标记已处理
+                    </button>
+                    <div v-else class="text-xs leading-5 text-slate-500">
+                      <div>处理人：<span class="font-medium text-slate-700">{{ customer.processedBy }}</span></div>
+                      <div v-if="customer.processedAt" class="text-slate-400">{{ customer.processedAt }}</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div v-if="store.tmsSyncCustomers.length === 0" class="flex h-40 items-center justify-center text-sm text-slate-400">暂无 TMS 同步客户提交记录</div>
+          </div>
         </section>
 
         <section v-else class="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-[#deded9] bg-white">
