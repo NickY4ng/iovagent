@@ -197,6 +197,7 @@ const rightPanelTitle = computed(() => {
   return '今日在途预警处理结果';
 });
 const agentGridClass = computed(() => (isRightPanelVisible.value ? 'grid-cols-[minmax(0,1fr)_minmax(380px,0.96fr)]' : 'grid-cols-1'));
+const conversationRailClass = computed(() => (isRightPanelVisible.value ? 'max-w-[800px]' : 'max-w-[1000px]'));
 const visibleQuickPrompts = computed(() => quickPrompts.slice(0, 3));
 
 const trendData = [
@@ -494,15 +495,16 @@ onBeforeUnmount(() => {
           {{ isRightPanelVisible ? '隐藏右栏' : '显示右栏' }}
         </button>
       </div>
-      <div ref="agentMessageListRef" class="flex-1 space-y-4 overflow-auto bg-[#fcfcfc] p-4 pb-60">
-        <div v-for="(m, i) in agentMessages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
-          <div
-            class="rounded-md px-4 py-3 text-sm leading-6"
-            :class="[
-              m.role === 'user' ? 'max-w-[72%] bg-slate-900 text-white' : 'border border-[#deded9] bg-white text-slate-700',
-              m.title ? 'max-w-[86%]' : 'max-w-[72%]',
-            ]"
-          >
+      <div ref="agentMessageListRef" class="flex-1 overflow-auto bg-[#fcfcfc] px-5 pt-4 pb-60">
+        <div class="mx-auto w-full space-y-4" :class="conversationRailClass">
+          <div v-for="(m, i) in agentMessages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
+            <div
+              class="rounded-md px-4 py-3 text-sm leading-6"
+              :class="[
+                m.role === 'user' ? 'max-w-[72%] bg-slate-900 text-white' : 'border border-[#deded9] bg-white text-slate-700',
+                m.title ? 'max-w-[86%]' : 'max-w-[72%]',
+              ]"
+            >
             <template v-if="m.role === 'agent' && m.title">
               <div class="mb-3 flex items-center justify-between gap-3 border-b border-[#ededea] pb-2">
                 <div>
@@ -593,11 +595,12 @@ onBeforeUnmount(() => {
             <template v-else>
               <span class="whitespace-pre-line">{{ m.text }}</span>
             </template>
+            </div>
           </div>
         </div>
       </div>
       <div class="pointer-events-none absolute right-0 bottom-4 left-0 z-20 px-5">
-        <div class="mx-auto max-w-[800px] space-y-3">
+        <div class="mx-auto w-full space-y-3" :class="conversationRailClass">
           <div
             class="pointer-events-auto flex h-10 items-center gap-2 overflow-hidden rounded-[18px] border border-[#deded9] bg-white px-3 shadow-[0_14px_34px_rgba(15,23,42,0.1),0_2px_8px_rgba(15,23,42,0.04)]"
           >
@@ -724,7 +727,11 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="isRightPanelVisible" class="flex h-full flex-col overflow-hidden border-l border-[#eeeeec] bg-white">
+    <div
+      v-if="isRightPanelVisible"
+      class="flex h-full flex-col overflow-hidden border-l border-[#eeeeec] bg-white"
+      :class="isExternalH5Panel ? 'relative z-10 shadow-[-14px_0_28px_-20px_rgba(15,23,42,0.35)]' : ''"
+    >
       <div class="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-[#eeeeec] bg-white px-4">
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold leading-5 text-slate-950">{{ rightPanelTitle }}</h2>
