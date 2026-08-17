@@ -844,6 +844,47 @@ export const agentWorkData = defineStore('agentWork', {
       this.closeAddProjectModal();
       ElMessage.success('项目创建成功');
     },
+    createImportedWaybillProject(name: string, importedCount: number, sourceFileNames: string[]) {
+      const importedRiskCount = Math.max(1, Math.round(importedCount * 0.08));
+      const sourceSummary = sourceFileNames.length > 1 ? `表格运单（${sourceFileNames.length} 个文件）` : `表格运单：${sourceFileNames[0] ?? '已导入文件'}`;
+      this.projects = [
+        {
+          id: `PIMP${Date.now()}`,
+          name,
+          status: '已连接',
+          sync: '刚刚',
+          total: importedCount,
+          risk: importedRiskCount,
+          tmsUrl: sourceSummary,
+          tmsUser: '文件导入',
+          keyword: '导入运单',
+          statusFilter: '在途',
+          skillIds: ['spreadsheet-waybill', 'route-risk-expert', 'gps-trace-expert', 'parking-event-expert'],
+        },
+        ...this.projects,
+      ];
+      ElMessage.success(`已创建“${name}”并导入 ${importedCount} 条运单`);
+    },
+    mergeImportedWaybills(projectId: string, importedCount: number) {
+      const targetProject = this.projects.find((project) => project.id === projectId);
+      if (!targetProject) {
+        ElMessage.warning('目标项目不存在，请重新选择');
+        return;
+      }
+      const importedRiskCount = Math.max(1, Math.round(importedCount * 0.08));
+      this.projects = this.projects.map((project) => {
+        if (project.id !== projectId) return project;
+        return {
+          ...project,
+          sync: '刚刚',
+          total: project.total + importedCount,
+          risk: project.risk + importedRiskCount,
+          tmsUrl: project.tmsUrl.includes('表格运单') ? project.tmsUrl : `${project.tmsUrl} / 表格运单`,
+          skillIds: Array.from(new Set([...(project.skillIds ?? []), 'spreadsheet-waybill'])),
+        };
+      });
+      ElMessage.success(`已将 ${importedCount} 条运单合并到“${targetProject.name}”`);
+    },
     addSkillProject(name: string, skillNames: string[], skillIds: string[]) {
       const projectId = `P${String(this.projects.length + 1).padStart(3, '0')}`;
       const skillSummary = skillNames.length > 0 ? skillNames.join(' / ') : '内置技能';
