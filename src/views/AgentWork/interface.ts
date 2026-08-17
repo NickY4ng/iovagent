@@ -12,6 +12,15 @@ export interface Project {
   skillIds?: string[];
 }
 
+export interface AgentConversation {
+  id: string;
+  messages: ChatMessage[];
+  title: string;
+  updatedAt: string;
+}
+
+export type AgentWorkspaceMode = 'conversation' | 'project';
+
 export type TmsSyncCustomerStatus = '已处理' | '未处理';
 
 export interface TmsSyncCustomer {

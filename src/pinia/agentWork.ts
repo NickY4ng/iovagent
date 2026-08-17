@@ -1,4 +1,15 @@
-import type { AgentResultFile, ChatMessage, DownloadTask, Order, PageId, Project, TimelineEvent, TmsSyncCustomer } from '@/views/AgentWork/interface';
+import type {
+  AgentConversation,
+  AgentResultFile,
+  AgentWorkspaceMode,
+  ChatMessage,
+  DownloadTask,
+  Order,
+  PageId,
+  Project,
+  TimelineEvent,
+  TmsSyncCustomer,
+} from '@/views/AgentWork/interface';
 
 import { ElMessage } from 'element-plus';
 import { defineStore } from 'pinia';
@@ -55,7 +66,91 @@ const projectsSeed: Project[] = [
     statusFilter: '装货中',
     skillIds: ['zhilian-shunda-tms', 'route-risk-expert', 'gps-trace-expert'],
   },
+  {
+    id: 'P004',
+    name: '华北啤酒城配协同',
+    status: '已连接',
+    sync: '5分钟前',
+    total: 96,
+    risk: 8,
+    tmsUrl: 'https://tms.beer-north.example.com',
+    tmsUser: 'beer_dispatch',
+    keyword: '华北城配',
+    statusFilter: '在途',
+    skillIds: ['qingdao-beer-tms', 'route-risk-expert', 'delivery-sla-expert'],
+  },
+  {
+    id: 'P005',
+    name: '今麦郎干线履约',
+    status: '已连接',
+    sync: '12分钟前',
+    total: 142,
+    risk: 13,
+    tmsUrl: 'https://tms.jinmailang.example.com',
+    tmsUser: 'linehaul_ops',
+    keyword: '今麦郎',
+    statusFilter: '全部',
+    skillIds: ['jinmailang-logistics', 'route-risk-expert', 'gps-trace-expert', 'delivery-sla-expert'],
+  },
+  {
+    id: 'P006',
+    name: '水泥区域配送项目',
+    status: '授权失效',
+    sync: '昨天 18:40',
+    total: 71,
+    risk: 5,
+    tmsUrl: 'https://tms.cement-region.example.com',
+    tmsUser: 'cement_ops',
+    keyword: '水泥配送',
+    statusFilter: '装货中',
+    skillIds: ['jinyu-cement-tms', 'parking-event-expert', 'delivery-sla-expert'],
+  },
+  {
+    id: 'P007',
+    name: '电商大件履约监控',
+    status: '已连接',
+    sync: '刚刚',
+    total: 58,
+    risk: 4,
+    tmsUrl: 'https://tms.bulky.example.com',
+    tmsUser: 'bulky_service',
+    keyword: '大件履约',
+    statusFilter: '在途',
+    skillIds: ['spreadsheet-waybill', 'route-risk-expert', 'delivery-sla-expert'],
+  },
 ];
+
+const projectWelcomeMessages: ChatMessage[] = [
+  { role: 'agent', text: '今日已同步 128 单，已加入在途监控 128 单。当前高风险 6 单、低风险 11 单。' },
+  { role: 'agent', text: '发现 2 单非目的地物流园长停、1 单 GPS 轨迹疑似造假，建议优先复核。' },
+];
+
+const conversationSeeds: AgentConversation[] = [
+  ['C001', '今日在途异常处理建议', '今天有哪些真正需要优先处理的在途异常？', '已汇总高风险运单，并按影响程度给出处理顺序。', '10分钟前'],
+  ['C002', '沪A12345当前位置查询', '查询沪A12345现在的位置。', '车辆最新定位在 G60 沪昆高速嘉兴服务区东侧，定位状态正常。', '26分钟前'],
+  ['C003', '华东线路高风险运单复核', '复核华东线路今天的高风险运单。', '已完成复核，建议优先人工核验 3 单。', '今天 09:42'],
+  ['C004', '8月16日在途日报', '生成昨天的在途运输日报。', '日报已生成，包含运单规模、异常分布和处理建议。', '昨天'],
+  ['C005', '承运商异常集中度分析', '分析近期异常是否集中在特定承运商。', '异常主要集中在安捷物流与远恒运输，已整理对应线路。', '昨天'],
+  ['C006', '皖K55821停车事件复盘', '复盘皖K55821的异常停车。', '该车存在一次合理休息和一次高风险非合同经停。', '8月15日'],
+  ['C007', '冷链到货时效预测', '预测冷链项目今晚的到货情况。', '预计 61 单按时到达，3 单存在延误风险。', '8月14日'],
+].map(([id, title, userText, agentText, updatedAt]) => ({
+  id,
+  title,
+  updatedAt,
+  messages: [
+    { role: 'user', text: userText },
+    { role: 'agent', text: agentText },
+  ],
+}));
+
+function cloneChatMessages(messages: ChatMessage[]) {
+  return messages.map((message) => ({
+    ...message,
+    file: message.file ? { ...message.file } : undefined,
+    link: message.link ? { ...message.link } : undefined,
+    steps: message.steps?.map((step) => ({ ...step })),
+  }));
+}
 
 const tmsSyncCustomerStorageKey = 'iovagent_tms_sync_customers';
 const tmsSyncCustomersSeed: TmsSyncCustomer[] = [
@@ -519,16 +614,19 @@ export const agentWorkData = defineStore('agentWork', {
       ordersStartDate: defaultOrdersDateRange.start,
       ordersEndDate: defaultOrdersDateRange.end,
       projects: [...projectsSeed] as Project[],
+      recentConversations: conversationSeeds.map((conversation) => ({
+        ...conversation,
+        messages: conversation.messages.map((message) => ({ ...message })),
+      })) as AgentConversation[],
       tmsSyncCustomers: loadTmsSyncCustomers(),
       currentProjectId: projectsSeed[0]!.id,
+      currentConversationId: '',
+      workspaceMode: 'project' as AgentWorkspaceMode,
       showProjectModal: false,
       downloadTask: null as DownloadTask | null,
       selectedOrder: { ...ordersSeedData[0]! } as Order,
       agentInput: '',
-      agentMessages: [
-        { role: 'agent', text: '今日已同步 128 单，已加入在途监控 128 单。当前高风险 6 单、低风险 11 单。' },
-        { role: 'agent', text: '发现 2 单非目的地物流园长停、1 单 GPS 轨迹疑似造假，建议优先复核。' },
-      ] as ChatMessage[],
+      agentMessages: projectWelcomeMessages.map((message) => ({ ...message })) as ChatMessage[],
       rightPanel: 'overview',
       externalH5Title: '',
       externalH5Url: '',
@@ -553,6 +651,9 @@ export const agentWorkData = defineStore('agentWork', {
     },
     currentProject(state): Project {
       return state.projects.find((p) => p.id === state.currentProjectId) ?? state.projects[0]!;
+    },
+    currentConversation(state): AgentConversation | null {
+      return state.recentConversations.find((conversation) => conversation.id === state.currentConversationId) ?? null;
     },
     ordersFiltered(state): Order[] {
       return state.ordersSeed.filter(
@@ -603,6 +704,57 @@ export const agentWorkData = defineStore('agentWork', {
     },
   },
   actions: {
+    persistActiveConversationMessages() {
+      if (this.workspaceMode !== 'conversation' || !this.currentConversationId) return;
+      this.recentConversations = this.recentConversations.map((conversation) =>
+        conversation.id === this.currentConversationId
+          ? {
+              ...conversation,
+              messages: cloneChatMessages(this.agentMessages),
+              updatedAt: '刚刚',
+            }
+          : conversation,
+      );
+    },
+    startNewConversation() {
+      this.persistActiveConversationMessages();
+      this.workspaceMode = 'conversation';
+      this.currentConversationId = '';
+      this.agentMessages = [];
+      this.agentInput = '';
+      this.rightPanel = 'overview';
+    },
+    openConversation(conversationId: string) {
+      this.persistActiveConversationMessages();
+      const conversation = this.recentConversations.find((item) => item.id === conversationId);
+      if (!conversation) return;
+      this.workspaceMode = 'conversation';
+      this.currentConversationId = conversation.id;
+      this.agentMessages = cloneChatMessages(conversation.messages);
+      this.agentInput = '';
+      this.rightPanel = 'overview';
+    },
+    renameConversation(conversationId: string, title: string) {
+      const normalizedTitle = title.trim();
+      if (!normalizedTitle) return;
+      this.recentConversations = this.recentConversations.map((conversation) =>
+        conversation.id === conversationId ? { ...conversation, title: normalizedTitle } : conversation,
+      );
+    },
+    ensureConversationStarted() {
+      if (this.workspaceMode !== 'conversation' || this.currentConversationId) return;
+      const conversationId = `C${Date.now()}`;
+      this.recentConversations = [
+        {
+          id: conversationId,
+          title: '对第一项对话的总结',
+          updatedAt: '刚刚',
+          messages: [],
+        },
+        ...this.recentConversations,
+      ];
+      this.currentConversationId = conversationId;
+    },
     submitTmsSyncCustomer(payload: Pick<TmsSyncCustomer, 'account' | 'enterpriseCid' | 'password' | 'systemUrl' | 'userPhone'>) {
       const now = new Date();
       this.tmsSyncCustomers = [
@@ -655,7 +807,13 @@ export const agentWorkData = defineStore('agentWork', {
       }, 1200);
     },
     switchProject(p: Project) {
+      this.persistActiveConversationMessages();
+      this.workspaceMode = 'project';
+      this.currentConversationId = '';
       this.currentProjectId = p.id;
+      this.agentMessages = cloneChatMessages(projectWelcomeMessages);
+      this.agentInput = '';
+      this.rightPanel = 'overview';
       ElMessage.success(`已切换到：${p.name}`);
     },
     openAddProjectModal() {
@@ -665,6 +823,8 @@ export const agentWorkData = defineStore('agentWork', {
       this.showProjectModal = false;
     },
     addDemoProject(address = '金隅水泥') {
+      this.workspaceMode = 'project';
+      this.currentConversationId = '';
       this.projects = [
         {
           id: `P00${this.projects.length + 1}`,
@@ -687,6 +847,8 @@ export const agentWorkData = defineStore('agentWork', {
     addSkillProject(name: string, skillNames: string[], skillIds: string[]) {
       const projectId = `P${String(this.projects.length + 1).padStart(3, '0')}`;
       const skillSummary = skillNames.length > 0 ? skillNames.join(' / ') : '内置技能';
+      this.workspaceMode = 'project';
+      this.currentConversationId = '';
       this.projects = [
         {
           id: projectId,
@@ -708,6 +870,8 @@ export const agentWorkData = defineStore('agentWork', {
     },
     updateSkillProject(projectId: string, name: string, skillNames: string[], skillIds: string[]) {
       const skillSummary = skillNames.length > 0 ? skillNames.join(' / ') : '内置技能';
+      this.workspaceMode = 'project';
+      this.currentConversationId = '';
       this.projects = this.projects.map((project) =>
         project.id === projectId
           ? {
@@ -758,12 +922,13 @@ export const agentWorkData = defineStore('agentWork', {
       clearAgentProcessTimers();
       const raw = text ?? this.agentInput;
       if (!raw.trim()) return;
+      this.ensureConversationStarted();
       const next: ChatMessage[] = [...this.agentMessages, { role: 'user', text: raw }];
       const spreadsheetRequest = extractSpreadsheetRequest(raw);
       const mcpPrompt = extractMcpPrompt(raw);
       const analysisReportRequest = extractAnalysisReportRequest(raw);
       const vehicleLocationRequest = extractVehicleLocationRequest(raw);
-      let replyMessage: ChatMessage = { role: 'agent', text: '已处理你的请求。结果已显示在右侧面板。' };
+      let replyMessage: ChatMessage = { role: 'agent', text: '已处理你的请求。你可以继续补充需要关注的范围。' };
       if (spreadsheetRequest) {
         this.startSpreadsheetFillProcess(next, spreadsheetRequest.sourceFileName);
         this.agentInput = '';
@@ -796,14 +961,14 @@ export const agentWorkData = defineStore('agentWork', {
         return;
       }
       if (raw.includes('在途预警') || raw.includes('真有风险')) {
-        this.startDelayedAgentProcess(next, createWarningProcessMessage('右侧面板已更新为今日在途预警处理结果。'), () => {
+        this.startDelayedAgentProcess(next, createWarningProcessMessage('已完成今日在途预警处理，真实高风险清单已整理。'), () => {
           this.rightPanel = 'risk';
         });
         this.agentInput = '';
         return;
       }
       if (raw.includes('皖K55821')) {
-        this.startDelayedAgentProcess(next, createOrderEventProcessMessage('右侧面板已切换为皖K55821异常停车事件。'), () => {
+        this.startDelayedAgentProcess(next, createOrderEventProcessMessage('已完成皖K55821异常停车事件分析。'), () => {
           this.rightPanel = 'orderEvent';
           this.detailView = 'agent';
           this.detailOnlyAbnormal = false;

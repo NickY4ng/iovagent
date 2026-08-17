@@ -43,6 +43,16 @@ interface AgentModelOption {
   value: string;
 }
 
+interface NewConversationGuide {
+  action?: 'projectCreate';
+  description: string;
+  icon: string;
+  iconClass: string;
+  prompt: string;
+  title: string;
+  upload?: boolean;
+}
+
 const agentModelOptions: AgentModelOption[] = [
   { value: 'auto', label: '自动', icon: strokeIconPaths.zap, iconClass: 'bg-slate-100 text-slate-700' },
   {
@@ -65,38 +75,66 @@ const agentModelOptions: AgentModelOption[] = [
   },
 ];
 
+const newConversationGuides: NewConversationGuide[] = [
+  {
+    title: '查询车辆',
+    description: '定位 · 轨迹 · 在途状态',
+    prompt: '查询车辆当前定位、行驶轨迹和在途状态',
+    icon: strokeIconPaths.locate,
+    iconClass: 'bg-blue-50 text-blue-600',
+  },
+  {
+    title: '导入运单监控在途',
+    description: '批量导入 · 自动监控',
+    prompt: '导入运单并开始监控车辆在途状态和异常风险',
+    icon: strokeIconPaths.upload,
+    iconClass: 'bg-violet-50 text-violet-600',
+    upload: true,
+  },
+  {
+    title: '连接系统分析业务',
+    action: 'projectCreate',
+    description: '连接 TMS · 经营分析',
+    prompt: '连接业务系统并分析当前物流运营情况',
+    icon: strokeIconPaths.panels,
+    iconClass: 'bg-emerald-50 text-emerald-600',
+  },
+  {
+    title: '填写表格或制作表格',
+    description: '补全数据 · 自动制表',
+    prompt: '根据上传的业务资料填写表格或制作新的物流表格',
+    icon: strokeIconPaths.fileSpreadsheet,
+    iconClass: 'bg-orange-50 text-orange-600',
+    upload: true,
+  },
+];
+
 const selectedAgentModel = ref(agentModelOptions[0]!);
 const isModelSelectOpen = ref(false);
 const modelSelectRef = ref<HTMLDivElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const composerTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const uploadedFiles = ref<File[]>([]);
 const isFileDragActive = ref(false);
-const isRightPanelVisible = ref(true);
+const isRightPanelVisible = ref(false);
 let fileDragDepth = 0;
 
 function setRightPanel(key: string) {
   store.rightPanel = key;
 }
 
-function toggleRightPanelVisibility() {
-  isRightPanelVisible.value = !isRightPanelVisible.value;
-}
-
 function closeRightPanelContent() {
-  if (store.visibleRightPanel === 'externalH5' || store.visibleRightPanel === 'analysisReport') {
-    store.showDefaultRightPanel();
-    return;
-  }
   isRightPanelVisible.value = false;
 }
 
 function openAgentResultLink(link: AgentResultLink) {
   if (link.kind === 'analysisReport') {
     store.openAnalysisReport(link.title, link.topic ?? link.title, link.prompt ?? link.label);
+    isRightPanelVisible.value = false;
   } else {
     store.openExternalH5(link.url, link.title);
+    isRightPanelVisible.value = true;
   }
-  isRightPanelVisible.value = true;
 }
 
 function selectAgentModel(option: AgentModelOption) {
@@ -123,6 +161,16 @@ function addUploadedFiles(files: File[]) {
 
 function openFilePicker() {
   fileInputRef.value?.click();
+}
+
+function selectNewConversationGuide(guide: NewConversationGuide) {
+  if (guide.action === 'projectCreate') {
+    goPage('projectCreate');
+    return;
+  }
+  agentInput.value = guide.prompt;
+  if (guide.upload) openFilePicker();
+  nextTick(() => composerTextareaRef.value?.focus());
 }
 
 function handleFileSelect(event: Event) {
@@ -196,8 +244,13 @@ const rightPanelTitle = computed(() => {
   if (isDefaultOverview.value) return '今日在途情况';
   return '今日在途预警处理结果';
 });
-const agentGridClass = computed(() => (isRightPanelVisible.value ? 'grid-cols-[minmax(0,1fr)_minmax(380px,0.96fr)]' : 'grid-cols-1'));
-const conversationRailClass = computed(() => (isRightPanelVisible.value ? 'max-w-[800px]' : 'max-w-[1000px]'));
+const workspaceTitle = computed(() => {
+  if (store.workspaceMode === 'conversation') return store.currentConversation?.title || '新对话';
+  return '智能体工作台';
+});
+const isExternalH5Visible = computed(() => isRightPanelVisible.value && isExternalH5Panel.value);
+const agentGridClass = computed(() => (isExternalH5Visible.value ? 'grid-cols-[minmax(0,1fr)_minmax(380px,0.96fr)]' : 'grid-cols-1'));
+const conversationRailClass = computed(() => (isExternalH5Visible.value ? 'max-w-[800px]' : 'max-w-[1000px]'));
 const visibleQuickPrompts = computed(() => quickPrompts.slice(0, 3));
 
 const trendData = [
@@ -447,22 +500,29 @@ watch(
   agentMessages,
   () => {
     scrollAgentMessagesToBottom();
+    store.persistActiveConversationMessages();
   },
   { deep: true },
 );
 
 watch(
+  [() => store.workspaceMode, () => store.currentConversationId],
+  () => {
+    isRightPanelVisible.value = false;
+    clearEventPanelMap();
+  },
+  { immediate: true },
+);
+
+watch(
   () => store.visibleRightPanel,
   (panel) => {
-    if (panel === 'externalH5' || panel === 'analysisReport') {
+    if (panel === 'externalH5') {
       isRightPanelVisible.value = true;
       clearEventPanelMap();
       return;
     }
-    if (panel === 'orderEvent') {
-      initEventPanelMap();
-      return;
-    }
+    isRightPanelVisible.value = false;
     clearEventPanelMap();
   },
   { immediate: true },
@@ -483,20 +543,47 @@ onBeforeUnmount(() => {
             <Icon :svg="strokeIconPaths.msg" :size="16" />
           </div>
           <div>
-            <h1 class="text-sm font-semibold leading-5 text-slate-950">智能体工作台</h1>
+            <h1 class="max-w-[420px] truncate text-sm font-semibold leading-5 text-slate-950">{{ workspaceTitle }}</h1>
           </div>
         </div>
         <button
+          v-if="isExternalH5Visible"
           type="button"
           class="inline-flex items-center gap-1 rounded-md border border-[#deded9] bg-[#f7f7f5] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-950"
-          @click="toggleRightPanelVisibility"
+          @click="closeRightPanelContent"
         >
-          <Icon :svg="strokeIconPaths.chevron" :size="13" :svg-class="isRightPanelVisible ? 'rotate-180' : ''" />
-          {{ isRightPanelVisible ? '隐藏右栏' : '显示右栏' }}
+          <Icon :svg="strokeIconPaths.chevron" :size="13" svg-class="rotate-180" />
+          隐藏右栏
         </button>
       </div>
-      <div ref="agentMessageListRef" class="flex-1 overflow-auto bg-[#fcfcfc] px-5 pt-4 pb-60">
+      <div ref="agentMessageListRef" class="flex-1 overflow-auto bg-[#fcfcfc] px-5 pt-4 pb-52">
         <div class="mx-auto w-full space-y-4" :class="conversationRailClass">
+          <div v-if="agentMessages.length === 0" class="flex min-h-[calc(100vh-330px)] flex-col items-center justify-center pt-20 text-center">
+            <span class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#dfdfda] bg-white text-slate-500">
+              <Icon :svg="strokeIconPaths.bot" :size="18" />
+            </span>
+            <h2 class="mt-4 text-[22px] font-semibold leading-8 text-slate-900">今天有什么工作需要处理？</h2>
+            <div class="mt-5 grid w-full max-w-[920px] grid-cols-2 gap-2.5 xl:grid-cols-4">
+              <button
+                v-for="guide in newConversationGuides"
+                :key="guide.title"
+                type="button"
+                class="group flex min-h-[104px] flex-col items-start justify-between rounded-lg border border-[#deded9] bg-white p-3.5 text-left transition hover:border-[#c8c8c2] hover:bg-[#fafaf8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
+                @click="selectNewConversationGuide(guide)"
+              >
+                <span class="flex h-7 w-7 items-center justify-center rounded-md" :class="guide.iconClass">
+                  <Icon :svg="guide.icon" :size="15" />
+                </span>
+                <span class="mt-4 flex w-full items-end justify-between gap-2">
+                  <span class="min-w-0">
+                    <span class="block truncate text-[13px] font-semibold leading-5 text-slate-800 group-hover:text-slate-950">{{ guide.title }}</span>
+                    <span class="mt-0.5 block truncate text-[11px] leading-4 text-slate-500">{{ guide.description }}</span>
+                  </span>
+                  <Icon :svg="strokeIconPaths.chevron" :size="13" svg-class="mb-0.5 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-500" />
+                </span>
+              </button>
+            </div>
+          </div>
           <div v-for="(m, i) in agentMessages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
             <div
               class="rounded-md px-4 py-3 text-sm leading-6"
@@ -600,9 +687,9 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="pointer-events-none absolute right-0 bottom-4 left-0 z-20 px-5">
-        <div class="mx-auto w-full space-y-3" :class="conversationRailClass">
+        <div class="mx-auto w-full space-y-2.5" :class="conversationRailClass">
           <div
-            class="pointer-events-auto flex h-10 items-center gap-2 overflow-hidden rounded-[18px] border border-[#deded9] bg-white px-3 shadow-[0_14px_34px_rgba(15,23,42,0.1),0_2px_8px_rgba(15,23,42,0.04)]"
+            class="pointer-events-auto flex h-9 items-center gap-2 overflow-hidden rounded-[14px] border border-[#deded9] bg-white px-2.5 shadow-[0_10px_26px_rgba(15,23,42,0.08),0_2px_6px_rgba(15,23,42,0.04)]"
           >
             <div class="shrink-0 text-xs font-medium text-slate-500">推荐指令</div>
             <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -610,7 +697,7 @@ onBeforeUnmount(() => {
                 v-for="s in visibleQuickPrompts"
                 :key="s"
                 type="button"
-                class="h-7 min-w-0 flex-1 rounded-full border border-[#e6e6e2] bg-[#f7f7f5] px-3 text-xs text-slate-600 transition hover:border-[#d8d8d2] hover:bg-white hover:text-slate-950"
+                class="h-6 min-w-0 flex-1 rounded-full border border-[#e6e6e2] bg-[#f7f7f5] px-3 text-xs text-slate-600 transition hover:border-[#d8d8d2] hover:bg-white hover:text-slate-950"
                 @click="sendAgent(s)"
               >
                 <span class="block truncate">{{ s }}</span>
@@ -618,8 +705,8 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div
-            class="pointer-events-auto relative rounded-[22px] border bg-white px-4 py-3 shadow-[0_18px_46px_rgba(15,23,42,0.12),0_2px_8px_rgba(15,23,42,0.04)] transition focus-within:border-[#4c8dff] focus-within:shadow-[0_18px_46px_rgba(15,23,42,0.12),0_0_0_3px_rgba(59,130,246,0.16)]"
-            :class="isFileDragActive ? 'border-[#4c8dff] bg-blue-50/70 shadow-[0_18px_46px_rgba(15,23,42,0.12),0_0_0_3px_rgba(59,130,246,0.16)]' : 'border-[#deded9]'"
+            class="pointer-events-auto relative rounded-[18px] border bg-white px-3.5 py-2.5 shadow-[0_14px_36px_rgba(15,23,42,0.11),0_2px_7px_rgba(15,23,42,0.04)] transition focus-within:border-[#4c8dff] focus-within:shadow-[0_14px_36px_rgba(15,23,42,0.11),0_0_0_3px_rgba(59,130,246,0.16)]"
+            :class="isFileDragActive ? 'border-[#4c8dff] bg-blue-50/70 shadow-[0_14px_36px_rgba(15,23,42,0.11),0_0_0_3px_rgba(59,130,246,0.16)]' : 'border-[#deded9]'"
             @dragenter.prevent.stop="handleComposerDragEnter"
             @dragover.prevent.stop
             @dragleave.prevent.stop="handleComposerDragLeave"
@@ -627,7 +714,7 @@ onBeforeUnmount(() => {
           >
             <div
               v-if="isFileDragActive"
-              class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[21px] bg-blue-50/95 text-sm font-medium text-blue-700"
+              class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[17px] bg-blue-50/95 text-sm font-medium text-blue-700"
             >
               松开以上传文件
             </div>
@@ -650,8 +737,9 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <textarea
+              ref="composerTextareaRef"
               v-model="agentInput"
-              class="min-h-[44px] w-full resize-none bg-transparent px-1 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
+              class="min-h-[40px] w-full resize-none bg-transparent px-1 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
               placeholder="发消息..."
               rows="1"
               @keydown.enter.exact.prevent="sendComposerMessage"
@@ -728,7 +816,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div
-      v-if="isRightPanelVisible"
+      v-if="isExternalH5Visible"
       class="flex h-full flex-col overflow-hidden border-l border-[#eeeeec] bg-white"
       :class="isExternalH5Panel ? 'relative z-10 shadow-[-14px_0_28px_-20px_rgba(15,23,42,0.35)]' : ''"
     >
@@ -737,9 +825,7 @@ onBeforeUnmount(() => {
           <h2 class="truncate text-sm font-semibold leading-5 text-slate-950">{{ rightPanelTitle }}</h2>
         </div>
         <div class="flex shrink-0 items-center gap-2">
-          <span v-if="!isExternalH5Panel && !isAnalysisReportPanel" class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium" :class="badgeToneClass('green')">实时同步</span>
           <a
-            v-else-if="isExternalH5Panel"
             :href="store.externalH5Url"
             target="_blank"
             rel="noreferrer"
@@ -750,8 +836,8 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-[#f2f2ef] hover:text-slate-800"
-            :aria-label="isExternalH5Panel ? '关闭外部 H5 页面' : isAnalysisReportPanel ? '关闭分析报告' : '关闭右侧栏'"
-            :title="isExternalH5Panel || isAnalysisReportPanel ? '关闭页面并返回默认看板' : '隐藏右侧栏'"
+            aria-label="关闭外部 H5 页面"
+            title="隐藏外部 H5 页面"
             @click="closeRightPanelContent"
           >
             <Icon :svg="strokeIconPaths.x" :size="15" />
