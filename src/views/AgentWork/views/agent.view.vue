@@ -14,6 +14,7 @@ import { agentWorkData, quickPrompts, rightPanelTabs } from '@/pinia/agentWork';
 import { getRiskOrders, badgeToneClass } from '../utils';
 import { strokeIconPaths } from '../strokeIconPaths';
 import { useAgentWorkNav } from '../useAgentWorkNav';
+import WaybillImportDialog from '../component/waybillImport.dialog.vue';
 import AnalysisReportView from './analysisReport.view.vue';
 
 const store = agentWorkData();
@@ -51,7 +52,16 @@ interface NewConversationGuide {
   prompt: string;
   title: string;
   upload?: boolean;
+  uploadPurpose?: 'regular' | 'waybill';
 }
+
+interface PendingWaybillImport {
+  files: File[];
+  importedCount: number;
+  source: 'regular' | 'waybill';
+}
+
+const waybillImportPrompt = '导入运单并开始监控车辆在途状态和异常风险';
 
 const agentModelOptions: AgentModelOption[] = [
   { value: 'auto', label: '自动', icon: strokeIconPaths.zap, iconClass: 'bg-slate-100 text-slate-700' },
@@ -86,10 +96,11 @@ const newConversationGuides: NewConversationGuide[] = [
   {
     title: '导入运单监控在途',
     description: '批量导入 · 自动监控',
-    prompt: '导入运单并开始监控车辆在途状态和异常风险',
+    prompt: waybillImportPrompt,
     icon: strokeIconPaths.upload,
     iconClass: 'bg-violet-50 text-violet-600',
     upload: true,
+    uploadPurpose: 'waybill',
   },
   {
     title: '连接系统分析业务',
@@ -117,6 +128,8 @@ const composerTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const uploadedFiles = ref<File[]>([]);
 const isFileDragActive = ref(false);
 const isRightPanelVisible = ref(false);
+const filePickerPurpose = ref<'regular' | 'waybill'>('regular');
+const pendingWaybillImport = ref<PendingWaybillImport | null>(null);
 let fileDragDepth = 0;
 
 function setRightPanel(key: string) {
@@ -157,10 +170,33 @@ function addUploadedFiles(files: File[]) {
     return true;
   });
   uploadedFiles.value = [...uploadedFiles.value, ...newFiles];
+  return newFiles;
 }
 
-function openFilePicker() {
+function openFilePicker(purpose: 'regular' | 'waybill' = 'regular') {
+  filePickerPurpose.value = purpose;
   fileInputRef.value?.click();
+}
+
+function isSpreadsheetFile(file: File) {
+  return /\.(?:csv|xls|xlsx)$/i.test(file.name);
+}
+
+function isWaybillListFile(file: File, purpose: 'regular' | 'waybill') {
+  if (!isSpreadsheetFile(file)) return false;
+  if (purpose === 'waybill') return true;
+  const waybillSignal = `${file.name} ${agentInput.value}`;
+  return /(?:运单|订单|货单|发运|运输|在途|车辆|物流|tms|waybill|order|shipment)/i.test(waybillSignal);
+}
+
+function openWaybillImportGuide(files: File[], purpose: 'regular' | 'waybill') {
+  const waybillFiles = files.filter((file) => isWaybillListFile(file, purpose));
+  if (waybillFiles.length === 0) return;
+  pendingWaybillImport.value = {
+    files: waybillFiles,
+    importedCount: 128,
+    source: purpose,
+  };
 }
 
 function selectNewConversationGuide(guide: NewConversationGuide) {
@@ -169,13 +205,16 @@ function selectNewConversationGuide(guide: NewConversationGuide) {
     return;
   }
   agentInput.value = guide.prompt;
-  if (guide.upload) openFilePicker();
+  if (guide.upload) openFilePicker(guide.uploadPurpose ?? 'regular');
   nextTick(() => composerTextareaRef.value?.focus());
 }
 
 function handleFileSelect(event: Event) {
   const input = event.target as HTMLInputElement;
-  addUploadedFiles(Array.from(input.files ?? []));
+  const purpose = filePickerPurpose.value;
+  const newFiles = addUploadedFiles(Array.from(input.files ?? []));
+  openWaybillImportGuide(newFiles, purpose);
+  filePickerPurpose.value = 'regular';
   input.value = '';
 }
 
@@ -196,7 +235,28 @@ function handleComposerDragLeave() {
 function handleComposerDrop(event: DragEvent) {
   fileDragDepth = 0;
   isFileDragActive.value = false;
-  addUploadedFiles(Array.from(event.dataTransfer?.files ?? []));
+  const newFiles = addUploadedFiles(Array.from(event.dataTransfer?.files ?? []));
+  openWaybillImportGuide(newFiles, 'regular');
+}
+
+function cancelWaybillImport() {
+  pendingWaybillImport.value = null;
+}
+
+function confirmWaybillImport(payload: { mode: 'create' | 'merge'; projectId: string; projectName: string }) {
+  const pendingImport = pendingWaybillImport.value;
+  if (!pendingImport) return;
+  const sourceFileNames = pendingImport.files.map((file) => file.name);
+  if (payload.mode === 'create') {
+    store.createImportedWaybillProject(payload.projectName, pendingImport.importedCount, sourceFileNames);
+  } else {
+    store.mergeImportedWaybills(payload.projectId, pendingImport.importedCount);
+  }
+
+  const importedFileKeys = new Set(pendingImport.files.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
+  uploadedFiles.value = uploadedFiles.value.filter((file) => !importedFileKeys.has(`${file.name}-${file.size}-${file.lastModified}`));
+  if (pendingImport.source === 'waybill' && agentInput.value === waybillImportPrompt) agentInput.value = '';
+  pendingWaybillImport.value = null;
 }
 
 function sendComposerMessage() {
@@ -1108,6 +1168,14 @@ onBeforeUnmount(() => {
       </template>
     </div>
   </div>
+  <WaybillImportDialog
+    :file-names="pendingWaybillImport?.files.map((file) => file.name) ?? []"
+    :imported-count="pendingWaybillImport?.importedCount ?? 0"
+    :open="Boolean(pendingWaybillImport)"
+    :projects="store.projects"
+    @cancel="cancelWaybillImport"
+    @confirm="confirmWaybillImport"
+  />
 </template>
 
 <style lang="scss" scoped>
