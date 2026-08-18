@@ -330,7 +330,13 @@ const timelineSeed: TimelineEvent[] = [
   { id: 6, type: 'normal', title: '到达卸货地', time: '次日 01:52', place: '广州仓', desc: '车辆进入卸货地围栏，等待卸货确认。' },
 ];
 
-export const quickPrompts = ['帮我处理一下今天的在途预警 挑出真有风险的运单', '只看皖K55821异常停车事件', '查看所有运单', '下载今天异常运单'];
+export const quickPrompts = [
+  '帮我处理一下今天的在途预警 挑出真有风险的运单',
+  '只看皖K55821异常停车事件',
+  '将上面结果通过邮件发送给 logistics.ops@example.com',
+  '查看所有运单',
+  '下载今天异常运单',
+];
 
 export const rightPanelTabs: [string, string][] = [
   ['overview', '概览'],
@@ -357,6 +363,90 @@ const orderEventProcessSteps = [
   { title: '渲染地图轨迹', text: '已加载运输路线、当前位置、装卸货节点和停靠点。' },
   { title: '标注异常事件', text: '已标注高速服务区低风险停车和第三方中转仓高风险停车。' },
 ];
+
+const warningResultText = [
+  '处理结论：今日 17 条在途预警已完成交叉核验，确认 5 单存在真实高风险，11 单属于合理低风险，1 单保留人工复核。',
+  '',
+  '真实高风险运单：',
+  '1. WB20260509001｜沪A12345｜上海工厂 → 广州仓｜非目的地物流园停车 94 分钟，叠加 GPS 断点和速度跳变，建议立即核查车辆与货物状态。',
+  '2. WB20260509007｜冀F21680｜北京仓 → 石家庄仓｜偏航 32km 后在建材市场停靠 126 分钟，疑似非计划卸货。',
+  '3. WB20260509018｜皖K55821｜合肥仓 → 南京仓｜第三方中转仓非合同经停 73 分钟，存在倒货或换车风险。',
+  '4. WB20260509023｜豫P67019｜郑州厂 → 武汉仓｜停车 112 分钟且点火与定位连续性冲突，疑似设备离车或轨迹补传。',
+  '5. WB20260509031｜浙A91766｜宁波港 → 苏州仓｜距目的地 79km 的第三方物流园长停 101 分钟，恢复行驶后方向异常。',
+  '',
+  '建议处置：优先联系前 3 单司机与承运商核实货物状态；对沪A12345、豫P67019发起轨迹真实性复核；其余合理停车暂不升级。',
+].join('\n');
+
+const orderEventResultText = [
+  '核验结论：皖K55821共识别 2 次停车，其中 1 次为合理休息，1 次确认为高风险异常停车。',
+  '',
+  '关联运单：WB20260509018',
+  '运输线路：合肥仓 → 南京仓',
+  '当前状态：车辆已恢复行驶，正驶向南京仓',
+  '',
+  '停车事件：',
+  '1. 11:05–11:48｜滁州高速服务区｜停车 43 分钟。轨迹连续，未超过 60 分钟阈值，符合司机途中休息场景，判定为低风险。',
+  '2. 14:32–15:45｜第三方中转仓｜停车 73 分钟。停靠点不在合同节点内，距南京仓约 18km，存在倒货、换车或非计划中转风险，判定为高风险。',
+  '',
+  '处置建议：立即联系司机确认中转仓停靠原因，要求提供现场照片或货物封签；同步承运商复核运输指令，并持续关注车辆到仓前轨迹。',
+].join('\n');
+
+interface EmailDeliveryRequest {
+  address: string;
+  sourceTitle: string;
+  subject: string;
+}
+
+const emailAddressPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const emailChannelPattern = /(?:邮件|邮箱|email|e-mail)/i;
+const emailSendActionPattern = /(?:发送|发给|发到|转发)/;
+
+function hasEmailDeliveryIntent(raw: string) {
+  return emailChannelPattern.test(raw) || (emailAddressPattern.test(raw) && emailSendActionPattern.test(raw));
+}
+
+function extractEmailDeliveryRequest(raw: string, messages: ChatMessage[]): EmailDeliveryRequest | null {
+  if (!hasEmailDeliveryIntent(raw)) return null;
+  const address = raw.match(emailAddressPattern)?.[0];
+  if (!address) return null;
+
+  const sourceMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'agent' && message.title);
+  const sourceTitle = sourceMessage?.title ?? '智能体处理结果';
+  const subject = sourceTitle.includes('在途预警')
+    ? '今日在途高风险运单处置清单'
+    : sourceTitle.includes('异常停车')
+      ? '皖K55821异常停车事件核验结果'
+      : `${sourceTitle}处理结果`;
+
+  return { address, sourceTitle, subject };
+}
+
+function createEmailDeliveryProcessMessage(request: EmailDeliveryRequest): ChatMessage {
+  const sentAt = formatTmsSyncCustomerTime();
+  return {
+    role: 'agent',
+    title: '邮件发送',
+    status: '已完成',
+    text: `正在将“${request.sourceTitle}”整理为邮件并发送。`,
+    progressMode: true,
+    steps: [
+      { title: '确认发送内容', text: `已选取最近一次“${request.sourceTitle}”的文字结论、风险明细和处置建议。` },
+      { title: '生成邮件正文', text: `邮件主题：${request.subject}；保留运单号、车牌号、风险依据和建议动作。` },
+      { title: '校验收件信息', text: `收件人 ${request.address} 格式有效，正文内容完整。` },
+      { title: '发送邮件', text: '已提交至企业邮件通道并取得发送回执。' },
+    ],
+    result: [
+      '发送成功',
+      `收件人：${request.address}`,
+      `邮件主题：${request.subject}`,
+      `发送内容：${request.sourceTitle}的完整文字结论、风险明细与处置建议`,
+      `发送时间：${sentAt}`,
+      `邮件回执：MAIL-${Date.now().toString(36).toUpperCase()}`,
+    ].join('\n'),
+  };
+}
 
 function createSpreadsheetFillSteps(sourceFileName: string): NonNullable<ChatMessage['steps']> {
   return [
@@ -481,6 +571,22 @@ function getVehicleLocationDemo(plate: string): VehicleLocationDemo {
   };
 }
 
+function createVehicleLocationH5Url(plate: string, waybill: string, location: VehicleLocationDemo) {
+  const heading = location.direction.match(/(\d+)°/)?.[1] ?? '0';
+  const params = new URLSearchParams({
+    plate,
+    waybill,
+    poi: location.poi,
+    direction: location.direction,
+    heading,
+    speed: location.speed,
+    time: location.lastLocationTime,
+    lat: location.latitude,
+    lng: location.longitude,
+  });
+  return `/demo/vehicle-location.html?${params.toString()}`;
+}
+
 function createVehicleLocationProcessMessage(plate: string, waybill: string, location: VehicleLocationDemo): ChatMessage {
   const queryObject = waybill ? `${waybill}（关联车辆 ${plate}）` : plate;
   return {
@@ -497,9 +603,11 @@ function createVehicleLocationProcessMessage(plate: string, waybill: string, loc
     ],
     result: `车辆：${plate}\n当前位置：${location.poi}\n航向：${location.direction} · 速度：${location.speed}\n最后定位时间：${location.lastLocationTime}\n经纬度：${location.latitude}, ${location.longitude}\n轨迹状态：定位连续，当前沿计划道路正常行驶。`,
     link: {
+      kind: 'externalH5',
       label: `查看 ${plate} 车辆定位的 H5 页面`,
       title: `${plate} 车辆定位`,
-      url: 'https://www.sinoiov.com/',
+      description: '实时定位 · 详细 POI · 航向与速度',
+      url: createVehicleLocationH5Url(plate, waybill, location),
     },
   };
 }
@@ -926,6 +1034,7 @@ export const agentWorkData = defineStore('agentWork', {
       const next: ChatMessage[] = [...this.agentMessages, { role: 'user', text: raw }];
       const spreadsheetRequest = extractSpreadsheetRequest(raw);
       const mcpPrompt = extractMcpPrompt(raw);
+      const emailDeliveryRequest = extractEmailDeliveryRequest(raw, this.agentMessages);
       const analysisReportRequest = extractAnalysisReportRequest(raw);
       const vehicleLocationRequest = extractVehicleLocationRequest(raw);
       let replyMessage: ChatMessage = { role: 'agent', text: '已处理你的请求。你可以继续补充需要关注的范围。' };
@@ -936,6 +1045,21 @@ export const agentWorkData = defineStore('agentWork', {
       }
       if (mcpPrompt) {
         await this.startMcpPromptTest(next, mcpPrompt);
+        this.agentInput = '';
+        return;
+      }
+      if (hasEmailDeliveryIntent(raw)) {
+        if (!emailDeliveryRequest) {
+          this.agentMessages = [
+            ...next,
+            { role: 'agent', text: '请补充有效的收件邮箱地址，例如 logistics.ops@example.com，我会将上一次处理结果整理后发送。' },
+          ];
+          this.agentInput = '';
+          return;
+        }
+        this.startDelayedAgentProcess(next, createEmailDeliveryProcessMessage(emailDeliveryRequest), () => {
+          ElMessage.success('邮件发送成功');
+        });
         this.agentInput = '';
         return;
       }
@@ -961,14 +1085,14 @@ export const agentWorkData = defineStore('agentWork', {
         return;
       }
       if (raw.includes('在途预警') || raw.includes('真有风险')) {
-        this.startDelayedAgentProcess(next, createWarningProcessMessage('已完成今日在途预警处理，真实高风险清单已整理。'), () => {
+        this.startDelayedAgentProcess(next, createWarningProcessMessage(warningResultText), () => {
           this.rightPanel = 'risk';
         });
         this.agentInput = '';
         return;
       }
       if (raw.includes('皖K55821')) {
-        this.startDelayedAgentProcess(next, createOrderEventProcessMessage('已完成皖K55821异常停车事件分析。'), () => {
+        this.startDelayedAgentProcess(next, createOrderEventProcessMessage(orderEventResultText), () => {
           this.rightPanel = 'orderEvent';
           this.detailView = 'agent';
           this.detailOnlyAbnormal = false;
