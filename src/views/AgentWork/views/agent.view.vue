@@ -88,8 +88,8 @@ const agentModelOptions: AgentModelOption[] = [
 const newConversationGuides: NewConversationGuide[] = [
   {
     title: '查询车辆',
-    description: '定位 · 轨迹 · 在途状态',
-    prompt: '查询车辆当前定位、行驶轨迹和在途状态',
+    description: '实时位置 · 航向 · 速度',
+    prompt: '查询车辆沪A12345的实时位置和定位信息',
     icon: strokeIconPaths.locate,
     iconClass: 'bg-blue-50 text-blue-600',
   },
@@ -127,7 +127,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const composerTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const uploadedFiles = ref<File[]>([]);
 const isFileDragActive = ref(false);
-const isRightPanelVisible = ref(false);
+const isRightPanelVisible = ref(store.workspaceMode === 'project');
 const filePickerPurpose = ref<'regular' | 'waybill'>('regular');
 const pendingWaybillImport = ref<PendingWaybillImport | null>(null);
 let fileDragDepth = 0;
@@ -136,18 +136,29 @@ function setRightPanel(key: string) {
   store.rightPanel = key;
 }
 
+function toggleRightPanelVisibility() {
+  isRightPanelVisible.value = !isRightPanelVisible.value;
+}
+
 function closeRightPanelContent() {
+  if (store.visibleRightPanel === 'externalH5' || store.visibleRightPanel === 'analysisReport') {
+    if (store.workspaceMode === 'project') {
+      store.showDefaultRightPanel();
+      isRightPanelVisible.value = true;
+      return;
+    }
+    store.showDefaultRightPanel();
+  }
   isRightPanelVisible.value = false;
 }
 
 function openAgentResultLink(link: AgentResultLink) {
   if (link.kind === 'analysisReport') {
     store.openAnalysisReport(link.title, link.topic ?? link.title, link.prompt ?? link.label);
-    isRightPanelVisible.value = false;
   } else {
     store.openExternalH5(link.url, link.title);
-    isRightPanelVisible.value = true;
   }
+  isRightPanelVisible.value = true;
 }
 
 function selectAgentModel(option: AgentModelOption) {
@@ -308,9 +319,12 @@ const workspaceTitle = computed(() => {
   if (store.workspaceMode === 'conversation') return store.currentConversation?.title || '新对话';
   return '智能体工作台';
 });
-const isExternalH5Visible = computed(() => isRightPanelVisible.value && isExternalH5Panel.value);
-const agentGridClass = computed(() => (isExternalH5Visible.value ? 'grid-cols-[minmax(0,1fr)_minmax(380px,0.96fr)]' : 'grid-cols-1'));
-const conversationRailClass = computed(() => (isExternalH5Visible.value ? 'max-w-[800px]' : 'max-w-[1000px]'));
+const isDynamicRightPanel = computed(() => isExternalH5Panel.value || isAnalysisReportPanel.value);
+const isRightPanelRendered = computed(
+  () => isRightPanelVisible.value && (store.workspaceMode === 'project' || isDynamicRightPanel.value),
+);
+const agentGridClass = computed(() => (isRightPanelRendered.value ? 'grid-cols-[minmax(0,1fr)_minmax(380px,0.96fr)]' : 'grid-cols-1'));
+const conversationRailClass = computed(() => (isRightPanelRendered.value ? 'max-w-[800px]' : 'max-w-[1000px]'));
 const visibleQuickPrompts = computed(() => quickPrompts.slice(0, 3));
 
 const trendData = [
@@ -566,27 +580,44 @@ watch(
 );
 
 watch(
-  [() => store.workspaceMode, () => store.currentConversationId],
-  () => {
-    isRightPanelVisible.value = false;
+  [() => store.workspaceMode, () => store.currentConversationId, () => store.currentProjectId],
+  ([workspaceMode]) => {
+    isRightPanelVisible.value = workspaceMode === 'project';
     clearEventPanelMap();
   },
   { immediate: true },
 );
 
 watch(
-  () => store.visibleRightPanel,
-  (panel) => {
-    if (panel === 'externalH5') {
+  [() => store.visibleRightPanel, () => store.workspaceMode],
+  ([panel, workspaceMode]) => {
+    if (panel === 'externalH5' || panel === 'analysisReport') {
       isRightPanelVisible.value = true;
       clearEventPanelMap();
       return;
     }
-    isRightPanelVisible.value = false;
+    if (workspaceMode === 'conversation') {
+      isRightPanelVisible.value = false;
+      clearEventPanelMap();
+      return;
+    }
+    if (panel === 'orderEvent') {
+      isRightPanelVisible.value = true;
+      initEventPanelMap();
+      return;
+    }
     clearEventPanelMap();
   },
   { immediate: true },
 );
+
+watch(isRightPanelVisible, (visible) => {
+  if (visible && store.workspaceMode === 'project' && store.visibleRightPanel === 'orderEvent') {
+    initEventPanelMap();
+    return;
+  }
+  if (!visible) clearEventPanelMap();
+});
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeComposerMenusOnOutside);
@@ -607,13 +638,13 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <button
-          v-if="isExternalH5Visible"
+          v-if="store.workspaceMode === 'project' || isRightPanelRendered"
           type="button"
           class="inline-flex items-center gap-1 rounded-md border border-[#deded9] bg-[#f7f7f5] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-950"
-          @click="closeRightPanelContent"
+          @click="toggleRightPanelVisibility"
         >
-          <Icon :svg="strokeIconPaths.chevron" :size="13" svg-class="rotate-180" />
-          隐藏右栏
+          <Icon :svg="strokeIconPaths.chevron" :size="13" :svg-class="isRightPanelRendered ? 'rotate-180' : ''" />
+          {{ isRightPanelRendered ? '隐藏右栏' : '显示右栏' }}
         </button>
       </div>
       <div ref="agentMessageListRef" class="flex-1 overflow-auto bg-[#fcfcfc] px-5 pt-4 pb-52">
@@ -876,7 +907,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div
-      v-if="isExternalH5Visible"
+      v-if="isRightPanelRendered"
       class="flex h-full flex-col overflow-hidden border-l border-[#eeeeec] bg-white"
       :class="isExternalH5Panel ? 'relative z-10 shadow-[-14px_0_28px_-20px_rgba(15,23,42,0.35)]' : ''"
     >
@@ -885,7 +916,13 @@ onBeforeUnmount(() => {
           <h2 class="truncate text-sm font-semibold leading-5 text-slate-950">{{ rightPanelTitle }}</h2>
         </div>
         <div class="flex shrink-0 items-center gap-2">
+          <span
+            v-if="!isDynamicRightPanel"
+            class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium"
+            :class="badgeToneClass('green')"
+          >实时同步</span>
           <a
+            v-if="isExternalH5Panel"
             :href="store.externalH5Url"
             target="_blank"
             rel="noreferrer"
@@ -896,8 +933,8 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-[#f2f2ef] hover:text-slate-800"
-            aria-label="关闭外部 H5 页面"
-            title="隐藏外部 H5 页面"
+            :aria-label="isDynamicRightPanel ? '关闭当前右侧页面' : '关闭右侧栏'"
+            :title="isDynamicRightPanel && store.workspaceMode === 'project' ? '关闭页面并返回默认看板' : '隐藏右侧栏'"
             @click="closeRightPanelContent"
           >
             <Icon :svg="strokeIconPaths.x" :size="15" />

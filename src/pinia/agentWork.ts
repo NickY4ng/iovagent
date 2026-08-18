@@ -502,12 +502,16 @@ function extractSpreadsheetRequest(raw: string) {
   return { prompt, sourceFileName };
 }
 
-interface VehicleLocationRequest {
+interface TransportStatusRequest {
   plate: string;
   waybill: string;
 }
 
-interface VehicleLocationDemo {
+interface VehiclePositionRequest {
+  plate: string;
+}
+
+interface VehiclePositionDemo {
   direction: string;
   lastLocationTime: string;
   latitude: string;
@@ -516,69 +520,264 @@ interface VehicleLocationDemo {
   speed: string;
 }
 
-const vehicleLocationQueryActions = ['查', '查询', '查找', '查看', '看看', '看下', '看一下', '帮我看', '帮我查', '获取', '调取', '检索', '搜索', '显示', '展示', '告诉我'];
-const vehicleLocationIntentTerms = [
+interface TransportStatusDemo {
+  actualDepartTime: string;
+  carrier: string;
+  cargo: string;
+  completedDistanceKm: number;
+  currentLatitude: string;
+  currentLongitude: string;
+  destinationAddress: string;
+  destinationLatitude: string;
+  destinationLongitude: string;
+  destinationName: string;
+  direction: string;
+  eta: string;
+  lastLocationTime: string;
+  originAddress: string;
+  originLatitude: string;
+  originLongitude: string;
+  originName: string;
+  poi: string;
+  progress: number;
+  speed: string;
+  totalDistanceKm: number;
+  transitNode: string;
+  waybillNo: string;
+}
+
+interface TransportScenario {
+  carrier: string;
+  cargo: string;
+  current: { lat: number; lng: number; name: string };
+  destination: { address: string; lat: number; lng: number; name: string };
+  direction: string;
+  origin: { address: string; lat: number; lng: number; name: string };
+  progressRange: [number, number];
+  totalDistanceKm: number;
+  transitNode: string;
+}
+
+const logisticsQueryActions = ['查', '查询', '查找', '查看', '看看', '看下', '看一下', '帮我看', '帮我查', '获取', '调取', '检索', '搜索', '显示', '展示', '告诉我'];
+const orderTargetTerms = ['订单', '运单', '货单', '发运单', '运输单', '单号', '运输任务', '货物'];
+const vehicleTargetTerms = ['车辆', '这辆车', '该车', '车牌', '货车', '司机'];
+const transportStatusIntentTerms = [
+  '运输情况',
+  '运输进度',
+  '运输状态',
+  '运输进展',
+  '在途状态',
+  '在途情况',
+  '在途进度',
+  '配送进度',
+  '发运进度',
+  '物流进度',
+  '到货进度',
+  '行程进度',
+  '运输到哪',
+  '运到哪',
+];
+const orderTransportDetailTerms = [
+  '位置',
   '定位',
-  '轨迹',
+  '到哪',
+  '进度',
+  '情况',
+  '状态',
+  '进展',
+  '剩余里程',
+  '预计到达',
+  '多久到达',
+  '多长时间到达',
+];
+const vehiclePositionIntentTerms = [
+  '实时定位',
+  '当前位置',
+  '实时位置',
+  '定位',
   '位置',
   '坐标',
   '经纬度',
   '车辆动态',
-  '行车记录',
-  '行驶记录',
-  '行车路线',
-  '行驶路线',
-  '行驶路径',
 ];
-const vehicleLocationTargetTerms = ['车辆', '这辆车', '该车', '车牌', '货车', '司机', '运单', '货物'];
-const vehicleLocationQuestionPattern = /(?:在哪(?:里|儿)?|到哪(?:里|儿)?了?|走到哪(?:里|儿)?了?|开到哪(?:里|儿)?了?|行驶到哪(?:里|儿)?了?|现在何处)/;
+const positionQuestionPattern = /(?:在哪(?:里|儿)?|到哪(?:里|儿)?了?|走到哪(?:里|儿)?了?|开到哪(?:里|儿)?了?|行驶到哪(?:里|儿)?了?|现在何处)/;
 const vehicleTrackingActionPattern = /(?:追踪|跟踪)(?:一下|下)?/;
 
-function extractVehicleLocationRequest(raw: string): VehicleLocationRequest | null {
+const transportScenarios: TransportScenario[] = [
+  {
+    origin: { name: '上海嘉定工厂', address: '上海市嘉定区胜辛南路 88 号', lat: 31.2304, lng: 121.4737 },
+    destination: { name: '广州黄埔仓', address: '广州市黄埔区开创大道 168 号', lat: 23.158, lng: 113.48 },
+    current: { name: 'G60 沪昆高速·南昌东段', lat: 28.6829, lng: 115.8582 },
+    transitNode: '南昌东枢纽',
+    direction: '西南方向（218°）',
+    totalDistanceKm: 1510,
+    progressRange: [0.46, 0.62],
+    cargo: '袋装水泥 P.O42.5',
+    carrier: '安捷物流',
+  },
+  {
+    origin: { name: '合肥经开仓', address: '合肥市经开区云谷路 3188 号', lat: 31.8206, lng: 117.2272 },
+    destination: { name: '南京江宁仓', address: '南京市江宁区诚信大道 885 号', lat: 31.9537, lng: 118.839 },
+    current: { name: 'G40 沪陕高速·滁州段', lat: 32.075, lng: 118.29 },
+    transitNode: '滁州服务区',
+    direction: '东南方向（116°）',
+    totalDistanceKm: 182,
+    progressRange: [0.52, 0.76],
+    cargo: '常温食品',
+    carrier: '顺达货运',
+  },
+  {
+    origin: { name: '北京顺义仓', address: '北京市顺义区顺平路 18 号', lat: 40.1289, lng: 116.6546 },
+    destination: { name: '石家庄栾城仓', address: '石家庄市栾城区裕翔街 165 号', lat: 37.9002, lng: 114.6483 },
+    current: { name: 'G4 京港澳高速·保定段', lat: 38.8737, lng: 115.4646 },
+    transitNode: '保定南收费站',
+    direction: '西南方向（205°）',
+    totalDistanceKm: 292,
+    progressRange: [0.48, 0.7],
+    cargo: '啤酒饮品',
+    carrier: '华北速运',
+  },
+  {
+    origin: { name: '青岛市北配送中心', address: '青岛市市北区瑞昌路 168 号', lat: 36.087, lng: 120.374 },
+    destination: { name: '济南历城仓', address: '济南市历城区工业北路 241 号', lat: 36.709, lng: 117.121 },
+    current: { name: 'G20 青银高速·潍坊段', lat: 36.7069, lng: 119.1618 },
+    transitNode: '潍坊西服务区',
+    direction: '正西方向（272°）',
+    totalDistanceKm: 367,
+    progressRange: [0.4, 0.64],
+    cargo: '快消品',
+    carrier: '远恒运输',
+  },
+  {
+    origin: { name: '成都龙泉工厂', address: '成都市龙泉驿区车城东七路 328 号', lat: 30.5728, lng: 104.269 },
+    destination: { name: '重庆江北仓', address: '重庆市江北区港城东路 2 号', lat: 29.6205, lng: 106.694 },
+    current: { name: 'G42 沪蓉高速·遂宁段', lat: 30.533, lng: 105.593 },
+    transitNode: '遂宁枢纽',
+    direction: '东南方向（124°）',
+    totalDistanceKm: 318,
+    progressRange: [0.43, 0.68],
+    cargo: '包装饮用水',
+    carrier: '西南联运',
+  },
+];
+
+const transportDemoPlates = ['沪A12345', '皖K55821', '冀F21680', '鲁B3M579', '川A6P82Q'];
+
+function randomBetween(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
+
+function formatDemoDateTime(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function createDemoWaybillNo() {
+  const date = new Date();
+  const day = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+  return `WB${day}${String(Math.floor(randomBetween(10, 999))).padStart(3, '0')}`;
+}
+
+function extractLogisticsReference(raw: string) {
   const normalized = raw.toUpperCase();
   const plate = normalized.match(/[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-Z0-9]{5,6}/)?.[0] ?? '';
   const waybill =
-    normalized.match(/WB\d{8,}/)?.[0] ?? normalized.match(/(?:运单号?|单号)[:：\s-]*([A-Z0-9-]{6,})/)?.[1] ?? '';
-  const hasQueryAction = vehicleLocationQueryActions.some((term) => raw.includes(term));
-  const hasLocationIntent = vehicleLocationIntentTerms.some((term) => raw.includes(term));
-  const hasLocationQuestion = vehicleLocationQuestionPattern.test(raw);
-  const hasTrackingAction = vehicleTrackingActionPattern.test(raw);
-  const hasTarget = Boolean(plate || waybill || vehicleLocationTargetTerms.some((term) => raw.includes(term)));
-
-  const isLocationQuery = (hasQueryAction && (hasLocationIntent || hasLocationQuestion || hasTrackingAction)) || (hasTarget && (hasLocationIntent || hasLocationQuestion || hasTrackingAction));
-  if (!isLocationQuery) return null;
+    normalized.match(/WB\d{8,}/)?.[0] ?? normalized.match(/(?:订单号?|运单号?|货单号?|发运单号?|运输单号?|单号)[:：\s#-]*([A-Z0-9-]{5,})/)?.[1] ?? '';
   return { plate, waybill };
 }
 
-function getVehicleLocationDemo(plate: string): VehicleLocationDemo {
-  if (plate === '皖K55821') {
-    return {
-      poi: '南京绕城高速·六合枢纽西南侧 1.2km',
-      direction: '东北方向（42°）',
-      lastLocationTime: '2026-08-03 16:39:52',
-      speed: '72 km/h',
-      latitude: '32.286842',
-      longitude: '118.823517',
-    };
-  }
+function extractTransportStatusRequest(raw: string): TransportStatusRequest | null {
+  const reference = extractLogisticsReference(raw);
+  const hasQueryAction = logisticsQueryActions.some((term) => raw.includes(term));
+  const hasOrderTarget = Boolean(reference.waybill || orderTargetTerms.some((term) => raw.includes(term)));
+  const hasVehicleTarget = Boolean(reference.plate || vehicleTargetTerms.some((term) => raw.includes(term)));
+  const hasStrongTransportIntent = transportStatusIntentTerms.some((term) => raw.includes(term));
+  const hasOrderDetailIntent = orderTransportDetailTerms.some((term) => raw.includes(term)) || positionQuestionPattern.test(raw);
+  const isTransportQuery =
+    (hasQueryAction || hasOrderTarget || hasVehicleTarget) &&
+    ((hasOrderTarget && hasOrderDetailIntent) || ((hasOrderTarget || hasVehicleTarget) && hasStrongTransportIntent));
+  if (!isTransportQuery) return null;
+  return reference;
+}
+
+function extractVehiclePositionRequest(raw: string): VehiclePositionRequest | null {
+  const reference = extractLogisticsReference(raw);
+  const hasOrderTarget = Boolean(reference.waybill || orderTargetTerms.some((term) => raw.includes(term)));
+  const hasTransportIntent = transportStatusIntentTerms.some((term) => raw.includes(term));
+  if (hasOrderTarget || hasTransportIntent) return null;
+
+  const hasQueryAction = logisticsQueryActions.some((term) => raw.includes(term));
+  const hasVehicleTarget = Boolean(reference.plate || vehicleTargetTerms.some((term) => raw.includes(term)));
+  const hasPositionIntent = vehiclePositionIntentTerms.some((term) => raw.includes(term));
+  const hasPositionQuestion = positionQuestionPattern.test(raw);
+  const hasTrackingAction = vehicleTrackingActionPattern.test(raw);
+  const isVehiclePositionQuery =
+    hasVehicleTarget &&
+    ((hasQueryAction && (hasPositionIntent || hasPositionQuestion || hasTrackingAction)) || hasPositionIntent || hasPositionQuestion || hasTrackingAction);
+  if (!isVehiclePositionQuery) return null;
+  return { plate: reference.plate };
+}
+
+function getVehiclePositionDemo(plate: string): VehiclePositionDemo {
+  const preferredScenarioIndex = plate === '皖K55821' ? 1 : Math.floor(Math.random() * transportScenarios.length);
+  const scenario = transportScenarios[preferredScenarioIndex] ?? transportScenarios[0]!;
+  const now = new Date(Date.now() - Math.round(randomBetween(15, 95)) * 1000);
   return {
-    poi: 'G60 沪昆高速·嘉兴服务区东侧 2.4km',
-    direction: '正东方向（88°）',
-    lastLocationTime: '2026-08-03 16:42:18',
-    speed: '68 km/h',
-    latitude: '30.768421',
-    longitude: '120.684295',
+    poi: scenario.current.name,
+    direction: scenario.direction,
+    lastLocationTime: formatDemoDateTime(now),
+    speed: `${Math.round(randomBetween(56, 82))} km/h`,
+    latitude: scenario.current.lat.toFixed(6),
+    longitude: scenario.current.lng.toFixed(6),
   };
 }
 
-function createVehicleLocationH5Url(plate: string, waybill: string, location: VehicleLocationDemo) {
-  const heading = location.direction.match(/(\d+)°/)?.[1] ?? '0';
+function getTransportStatusDemo(plate: string): TransportStatusDemo {
+  const preferredScenarioIndex = plate === '皖K55821' ? 1 : Math.floor(Math.random() * transportScenarios.length);
+  const scenario = transportScenarios[preferredScenarioIndex] ?? transportScenarios[0]!;
+  const progress = Math.round(randomBetween(...scenario.progressRange) * 100);
+  const totalDistanceKm = Math.round(scenario.totalDistanceKm * randomBetween(0.98, 1.025));
+  const completedDistanceKm = Math.round((totalDistanceKm * progress) / 100);
+  const speedKmh = Math.round(randomBetween(58, 82));
+  const remainingDistanceKm = totalDistanceKm - completedDistanceKm;
+  const etaHours = remainingDistanceKm / (speedKmh * randomBetween(0.72, 0.84)) + randomBetween(0.25, 1.1);
+  const elapsedHours = completedDistanceKm / (speedKmh * randomBetween(0.75, 0.86));
+  const now = new Date();
+  const actualDepartAt = new Date(now.getTime() - elapsedHours * 60 * 60 * 1000);
+  const etaAt = new Date(now.getTime() + etaHours * 60 * 60 * 1000);
+
+  return {
+    actualDepartTime: formatDemoDateTime(actualDepartAt),
+    carrier: scenario.carrier,
+    cargo: scenario.cargo,
+    completedDistanceKm,
+    currentLatitude: scenario.current.lat.toFixed(6),
+    currentLongitude: scenario.current.lng.toFixed(6),
+    destinationAddress: scenario.destination.address,
+    destinationLatitude: scenario.destination.lat.toFixed(6),
+    destinationLongitude: scenario.destination.lng.toFixed(6),
+    destinationName: scenario.destination.name,
+    direction: scenario.direction,
+    eta: formatDemoDateTime(etaAt),
+    lastLocationTime: formatDemoDateTime(now),
+    originAddress: scenario.origin.address,
+    originLatitude: scenario.origin.lat.toFixed(6),
+    originLongitude: scenario.origin.lng.toFixed(6),
+    originName: scenario.origin.name,
+    poi: scenario.current.name,
+    progress,
+    speed: `${speedKmh} km/h`,
+    totalDistanceKm,
+    transitNode: scenario.transitNode,
+    waybillNo: createDemoWaybillNo(),
+  };
+}
+
+function createVehiclePositionH5Url(plate: string, location: VehiclePositionDemo) {
   const params = new URLSearchParams({
     plate,
-    waybill,
     poi: location.poi,
     direction: location.direction,
-    heading,
     speed: location.speed,
     time: location.lastLocationTime,
     lat: location.latitude,
@@ -587,27 +786,84 @@ function createVehicleLocationH5Url(plate: string, waybill: string, location: Ve
   return `/demo/vehicle-location.html?${params.toString()}`;
 }
 
-function createVehicleLocationProcessMessage(plate: string, waybill: string, location: VehicleLocationDemo): ChatMessage {
-  const queryObject = waybill ? `${waybill}（关联车辆 ${plate}）` : plate;
+function createVehiclePositionProcessMessage(plate: string, location: VehiclePositionDemo): ChatMessage {
   return {
     role: 'agent',
-    title: '车辆定位与轨迹查询',
+    title: '车辆实时定位查询',
     status: '已完成',
-    text: `正在查询 ${queryObject} 的最新定位与行驶轨迹。`,
+    text: `正在查询车辆 ${plate} 的最后一次有效定位。`,
+    progressMode: true,
+    steps: [
+      { title: '识别车辆', text: `已识别查询车辆：${plate}。` },
+      { title: '调用车辆定位', text: '获取车辆最新经纬度、POI、速度、航向和定位时间。', skill: '车辆定位查询' },
+      { title: '校验定位质量', text: '核验 GPS 在线状态、定位时间和坐标有效性。', skill: '车辆定位查询' },
+      { title: '生成定位页面', text: '生成仅包含车辆当前位置与定位详情的 H5 页面。' },
+    ],
+    result: `车辆：${plate}\n当前位置：${location.poi}\n航向：${location.direction}\n速度：${location.speed}\n最后定位时间：${location.lastLocationTime}\n经纬度：${location.latitude}, ${location.longitude}\n定位状态：GPS 在线，定位信号稳定。`,
+    link: {
+      kind: 'externalH5',
+      label: `查看 ${plate} 实时位置`,
+      title: `${plate} · 车辆实时位置`,
+      description: '单点定位 · 详细 POI · 航向与速度',
+      url: createVehiclePositionH5Url(plate, location),
+    },
+  };
+}
+
+function createOrderTransportH5Url(plate: string, waybill: string, location: TransportStatusDemo) {
+  const params = new URLSearchParams({
+    plate,
+    waybill: waybill || location.waybillNo,
+    carrier: location.carrier,
+    cargo: location.cargo,
+    poi: location.poi,
+    direction: location.direction,
+    speed: location.speed,
+    time: location.lastLocationTime,
+    eta: location.eta,
+    departTime: location.actualDepartTime,
+    progress: String(location.progress),
+    totalDistance: String(location.totalDistanceKm),
+    completedDistance: String(location.completedDistanceKm),
+    originName: location.originName,
+    originAddress: location.originAddress,
+    originLat: location.originLatitude,
+    originLng: location.originLongitude,
+    destinationName: location.destinationName,
+    destinationAddress: location.destinationAddress,
+    destinationLat: location.destinationLatitude,
+    destinationLng: location.destinationLongitude,
+    currentLat: location.currentLatitude,
+    currentLng: location.currentLongitude,
+    transitNode: location.transitNode,
+  });
+  return `/demo/order-transport.html?${params.toString()}`;
+}
+
+function createTransportStatusProcessMessage(plate: string, waybill: string, location: TransportStatusDemo): ChatMessage {
+  const resolvedWaybill = waybill || location.waybillNo;
+  const queryObject = `${resolvedWaybill}（车辆 ${plate}）`;
+  return {
+    role: 'agent',
+    title: '订单运输情况查询',
+    status: '已完成',
+    text: `正在查询 ${queryObject} 的在途位置、运输进度与预计到达情况。`,
     progressMode: true,
     steps: [
       { title: '识别查询对象', text: `已识别查询对象：${queryObject}。` },
+      { title: '查询订单与车辆', text: '读取装卸货地、承运商、货物、发车时间和车辆绑定关系。', skill: '运单补充' },
       { title: '查询车辆定位', text: '获取车辆最新经纬度、POI、速度、航向和定位时间。', skill: '车辆定位查询' },
-      { title: '查询行驶轨迹', text: '核验最近行驶轨迹、道路匹配结果和定位连续性。', skill: '轨迹查询' },
-      { title: '生成定位结果', text: '汇总当前位置与轨迹核验结果，生成车辆定位 H5 页面。' },
+      { title: '核验运输轨迹', text: '按道路拟合行驶轨迹，计算已行驶里程、剩余里程和在途进度。', skill: '轨迹查询' },
+      { title: '预测到达时间', text: '结合剩余路程、实时速度和线路时效计算预计到达时间。', skill: '到货时效专家' },
+      { title: '生成运输页面', text: '汇总地图、装卸货点和运输节点 Timeline，生成订单运输情况 H5。' },
     ],
-    result: `车辆：${plate}\n当前位置：${location.poi}\n航向：${location.direction} · 速度：${location.speed}\n最后定位时间：${location.lastLocationTime}\n经纬度：${location.latitude}, ${location.longitude}\n轨迹状态：定位连续，当前沿计划道路正常行驶。`,
+    result: `运单：${resolvedWaybill}\n车辆：${plate} · ${location.carrier}\n线路：${location.originName} → ${location.destinationName}\n货物：${location.cargo}\n当前位置：${location.poi}\n运输进度：${location.progress}%（已行驶 ${location.completedDistanceKm} / ${location.totalDistanceKm} km）\n预计到达：${location.eta}\n车辆动态：${location.direction} · ${location.speed}\n最后定位：${location.lastLocationTime}\n轨迹状态：定位连续，当前沿计划道路正常行驶。`,
     link: {
       kind: 'externalH5',
-      label: `查看 ${plate} 车辆定位的 H5 页面`,
-      title: `${plate} 车辆定位`,
-      description: '实时定位 · 详细 POI · 航向与速度',
-      url: createVehicleLocationH5Url(plate, waybill, location),
+      label: `查看 ${resolvedWaybill} 运输情况`,
+      title: `${plate} · 订单运输情况`,
+      description: `${location.originName} → ${location.destinationName} · 预计 ${location.eta.slice(5, 16)} 到达`,
+      url: createOrderTransportH5Url(plate, resolvedWaybill, location),
     },
   };
 }
@@ -1077,7 +1333,8 @@ export const agentWorkData = defineStore('agentWork', {
       const mcpPrompt = extractMcpPrompt(raw);
       const emailDeliveryRequest = extractEmailDeliveryRequest(raw, this.agentMessages);
       const analysisReportRequest = extractAnalysisReportRequest(raw);
-      const vehicleLocationRequest = extractVehicleLocationRequest(raw);
+      const transportStatusRequest = extractTransportStatusRequest(raw);
+      const vehiclePositionRequest = transportStatusRequest ? null : extractVehiclePositionRequest(raw);
       let replyMessage: ChatMessage = { role: 'agent', text: '已处理你的请求。你可以继续补充需要关注的范围。' };
       if (spreadsheetRequest) {
         this.startSpreadsheetFillProcess(next, spreadsheetRequest.sourceFileName);
@@ -1112,13 +1369,30 @@ export const agentWorkData = defineStore('agentWork', {
         this.agentInput = '';
         return;
       }
-      if (vehicleLocationRequest) {
-        const matchedOrder = vehicleLocationRequest.waybill
-          ? this.ordersSeed.find((order) => order.id.toUpperCase() === vehicleLocationRequest.waybill)
+      if (transportStatusRequest) {
+        const matchedOrder = transportStatusRequest.waybill
+          ? this.ordersSeed.find((order) => order.id.toUpperCase() === transportStatusRequest.waybill)
           : undefined;
-        const plate = vehicleLocationRequest.plate || matchedOrder?.plate || '沪A12345';
-        const location = getVehicleLocationDemo(plate);
-        const processMessage = createVehicleLocationProcessMessage(plate, vehicleLocationRequest.waybill, location);
+        const plate =
+          transportStatusRequest.plate ||
+          matchedOrder?.plate ||
+          transportDemoPlates[Math.floor(Math.random() * transportDemoPlates.length)] ||
+          '沪A12345';
+        const location = getTransportStatusDemo(plate);
+        const processMessage = createTransportStatusProcessMessage(plate, transportStatusRequest.waybill, location);
+        this.startDelayedAgentProcess(next, processMessage, () => {
+          this.openExternalH5(processMessage.link!.url, processMessage.link!.title);
+        });
+        this.agentInput = '';
+        return;
+      }
+      if (vehiclePositionRequest) {
+        const plate =
+          vehiclePositionRequest.plate ||
+          transportDemoPlates[Math.floor(Math.random() * transportDemoPlates.length)] ||
+          '沪A12345';
+        const location = getVehiclePositionDemo(plate);
+        const processMessage = createVehiclePositionProcessMessage(plate, location);
         this.startDelayedAgentProcess(next, processMessage, () => {
           this.openExternalH5(processMessage.link!.url, processMessage.link!.title);
         });

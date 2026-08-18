@@ -8,11 +8,9 @@
     <style>
       :root {
         color-scheme: light;
-        font-family:
-          Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system,
-          BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color: #172033;
-        background: #f5f6f8;
+        background: #f7f8fa;
         font-synthesis: none;
       }
 
@@ -24,12 +22,7 @@
         min-width: 320px;
         min-height: 100vh;
         margin: 0;
-        background: #f5f6f8;
-      }
-
-      button,
-      a {
-        -webkit-tap-highlight-color: transparent;
+        background: #f7f8fa;
       }
 
       ::selection {
@@ -46,45 +39,45 @@
 
       .topbar {
         display: flex;
+        min-height: 44px;
         align-items: center;
         justify-content: space-between;
         gap: 16px;
-        min-height: 44px;
         border-bottom: 1px solid #e2e5ea;
       }
 
       .brand {
         display: flex;
+        min-width: 0;
         align-items: center;
         gap: 10px;
-        min-width: 0;
+        color: #111827;
         font-size: 14px;
         font-weight: 650;
-        color: #111827;
       }
 
       .brand-mark {
         display: inline-flex;
         width: 26px;
         height: 26px;
+        flex: 0 0 auto;
         align-items: center;
         justify-content: center;
-        flex: 0 0 auto;
         border-radius: 7px;
         background: #172033;
-        color: #ffffff;
+        color: #fff;
         font-size: 12px;
         font-weight: 700;
       }
 
       .online {
         display: inline-flex;
+        flex: 0 0 auto;
         align-items: center;
         gap: 7px;
-        flex: 0 0 auto;
+        color: #157347;
         font-size: 12px;
         font-weight: 600;
-        color: #157347;
       }
 
       .online::before {
@@ -106,19 +99,18 @@
 
       .summary h1 {
         margin: 0;
+        color: #101828;
         font-size: clamp(22px, 3vw, 32px);
         font-weight: 680;
-        line-height: 1.25;
         letter-spacing: 0;
-        color: #101828;
+        line-height: 1.25;
       }
 
       .summary p {
-        max-width: 72ch;
         margin: 7px 0 0;
+        color: #5c667a;
         font-size: 13px;
         line-height: 1.7;
-        color: #5c667a;
       }
 
       .updated {
@@ -129,14 +121,14 @@
       .updated span {
         display: block;
         margin-bottom: 3px;
-        font-size: 11px;
         color: #7d8799;
+        font-size: 11px;
       }
 
       .updated strong {
+        color: #344054;
         font-size: 13px;
         font-weight: 620;
-        color: #344054;
       }
 
       .map-shell {
@@ -162,8 +154,8 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
-        text-align: center;
         color: #667085;
+        text-align: center;
       }
 
       .map-fallback[hidden] {
@@ -185,17 +177,17 @@
 
       .map-overlay-label {
         margin-bottom: 5px;
+        color: #5270a3;
         font-size: 11px;
         font-weight: 650;
-        color: #5270a3;
       }
 
       .map-overlay-title {
         overflow-wrap: anywhere;
+        color: #172033;
         font-size: 14px;
         font-weight: 650;
         line-height: 1.55;
-        color: #172033;
       }
 
       .map-overlay-meta {
@@ -203,8 +195,8 @@
         flex-wrap: wrap;
         gap: 6px 16px;
         margin-top: 8px;
-        font-size: 12px;
         color: #556176;
+        font-size: 12px;
       }
 
       .details {
@@ -221,34 +213,30 @@
       .detail {
         min-width: 0;
         padding: 14px 15px;
-        background: #ffffff;
+        background: #fff;
       }
 
       .detail dt {
         margin: 0;
+        color: #7b8494;
         font-size: 11px;
         line-height: 1.4;
-        color: #7b8494;
       }
 
       .detail dd {
         margin: 6px 0 0;
         overflow-wrap: anywhere;
+        color: #273249;
         font-size: 13px;
         font-weight: 620;
         line-height: 1.55;
-        color: #273249;
       }
 
       .coordinate {
         margin-top: 12px;
+        color: #7b8494;
         font-size: 11px;
         line-height: 1.6;
-        color: #7b8494;
-      }
-
-      .leaflet-control-attribution {
-        font-size: 9px;
       }
 
       .vehicle-map-icon {
@@ -257,62 +245,22 @@
       }
 
       .vehicle-marker {
-        position: relative;
-        width: 42px;
-        height: 42px;
-      }
-
-      .heading-arrow {
-        position: absolute;
-        top: -14px;
-        left: 16px;
-        width: 0;
-        height: 0;
-        border-right: 5px solid transparent;
-        border-bottom: 14px solid #1d5fd1;
-        border-left: 5px solid transparent;
-        transform: rotate(var(--heading));
-        transform-origin: 5px 35px;
-        filter: drop-shadow(0 2px 2px rgba(29, 95, 209, 0.24));
-      }
-
-      .vehicle-dot {
-        position: absolute;
-        inset: 0;
         display: flex;
+        width: 38px;
+        height: 38px;
         align-items: center;
         justify-content: center;
-        border: 3px solid #ffffff;
-        border-radius: 50%;
-        background: #1d5fd1;
-        box-shadow: 0 7px 18px rgba(16, 24, 40, 0.28);
-        color: #ffffff;
+        border: 3px solid #fff;
+        border-radius: 11px;
+        background: #2563eb;
+        box-shadow: 0 7px 18px rgba(15, 23, 42, 0.24);
+        color: #fff;
         font-size: 13px;
         font-weight: 750;
       }
 
-      .leaflet-popup-content-wrapper {
-        border-radius: 8px;
-        box-shadow: 0 12px 30px -18px rgba(16, 24, 40, 0.6);
-      }
-
-      .leaflet-popup-content {
-        min-width: 210px;
-        margin: 12px 14px;
-        font-family: inherit;
-        line-height: 1.55;
-      }
-
-      .popup-title {
-        margin-bottom: 5px;
-        font-size: 13px;
-        font-weight: 700;
-        color: #172033;
-      }
-
-      .popup-line {
-        font-size: 12px;
-        color: #5b6679;
+      .leaflet-control-attribution {
+        font-size: 9px;
       }
 
       @media (max-width: 720px) {
@@ -323,15 +271,10 @@
         .summary {
           grid-template-columns: 1fr;
           gap: 12px;
-          padding-top: 18px;
         }
 
         .updated {
           text-align: left;
-        }
-
-        .map-shell {
-          min-height: 390px;
         }
 
         .details {
@@ -340,18 +283,8 @@
       }
 
       @media (max-width: 430px) {
-        .summary h1 {
-          font-size: 22px;
-        }
-
         .map-shell {
-          min-height: 360px;
-        }
-
-        .map-overlay {
-          right: 10px;
-          bottom: 10px;
-          width: calc(100% - 20px);
+          min-height: 500px;
         }
 
         .details {
@@ -363,56 +296,35 @@
   <body>
     <main class="page">
       <header class="topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">车</span>
-          <span>车辆实时位置</span>
-        </div>
+        <div class="brand"><span class="brand-mark">大卡</span><span>车辆定位查询</span></div>
         <div class="online">定位正常</div>
       </header>
 
-      <section class="summary" aria-labelledby="vehicle-title">
+      <section class="summary" aria-labelledby="location-title">
         <div>
-          <h1 id="vehicle-title">车辆 <span id="plate">沪A12345</span></h1>
-          <p id="poi-summary">G60 沪昆高速·嘉兴服务区东侧 2.4km</p>
+          <h1 id="location-title"><span id="plate">沪A12345</span> 实时位置</h1>
+          <p>展示车辆最后一次有效定位，不包含订单路线和运输进度。</p>
         </div>
-        <div class="updated">
-          <span>最后定位时间</span>
-          <strong id="last-time">2026-08-03 16:42:18</strong>
-        </div>
+        <div class="updated"><span>最后定位时间</span><strong id="time">--</strong></div>
       </section>
 
-      <section class="map-shell" aria-label="车辆当前位置地图">
-        <div id="map-fallback" class="map-fallback">正在加载真实地图底图...</div>
+      <section class="map-shell" aria-label="车辆实时位置地图">
         <div id="map"></div>
+        <div id="map-fallback" class="map-fallback">正在加载地图底图...</div>
         <div class="map-overlay">
           <div class="map-overlay-label">当前位置 POI</div>
-          <div id="poi" class="map-overlay-title">G60 沪昆高速·嘉兴服务区东侧 2.4km</div>
-          <div class="map-overlay-meta">
-            <span>航向 <strong id="direction">正东方向（88°）</strong></span>
-            <span>速度 <strong id="speed">68 km/h</strong></span>
-          </div>
+          <div id="poi" class="map-overlay-title">--</div>
+          <div class="map-overlay-meta"><span id="direction">--</span><span id="speed">--</span></div>
         </div>
       </section>
 
       <dl class="details">
-        <div class="detail">
-          <dt>车牌号</dt>
-          <dd id="plate-detail">沪A12345</dd>
-        </div>
-        <div class="detail">
-          <dt>关联运单</dt>
-          <dd id="waybill">未关联运单</dd>
-        </div>
-        <div class="detail">
-          <dt>行驶方向</dt>
-          <dd id="direction-detail">正东方向（88°）</dd>
-        </div>
-        <div class="detail">
-          <dt>当前速度</dt>
-          <dd id="speed-detail">68 km/h</dd>
-        </div>
+        <div class="detail"><dt>车辆</dt><dd id="detail-plate">--</dd></div>
+        <div class="detail"><dt>定位状态</dt><dd>GPS 在线 · 信号稳定</dd></div>
+        <div class="detail"><dt>航向</dt><dd id="detail-direction">--</dd></div>
+        <div class="detail"><dt>当前速度</dt><dd id="detail-speed">--</dd></div>
       </dl>
-      <div class="coordinate">定位坐标：<span id="coordinate">30.768421, 120.684295</span> · 地图数据 © OpenStreetMap contributors</div>
+      <div class="coordinate">经纬度：<span id="coordinate">--</span> · 数据为演示仿真结果</div>
     </main>
 
     <script
@@ -422,77 +334,70 @@
     ></script>
     <script>
       const params = new URLSearchParams(window.location.search);
-      const read = (key, fallback) => params.get(key)?.trim() || fallback;
-      const plate = read('plate', '沪A12345');
-      const waybill = read('waybill', '');
-      const poi = read('poi', 'G60 沪昆高速·嘉兴服务区东侧 2.4km');
-      const direction = read('direction', '正东方向（88°）');
-      const speed = read('speed', '68 km/h');
-      const lastTime = read('time', '2026-08-03 16:42:18');
-      const heading = Number.parseFloat(read('heading', '88'));
-      const parsedLat = Number.parseFloat(read('lat', '30.768421'));
-      const parsedLng = Number.parseFloat(read('lng', '120.684295'));
-      const lat = Number.isFinite(parsedLat) && Math.abs(parsedLat) <= 90 ? parsedLat : 30.768421;
-      const lng = Number.isFinite(parsedLng) && Math.abs(parsedLng) <= 180 ? parsedLng : 120.684295;
-      const safeHeading = Number.isFinite(heading) ? heading : 88;
-
-      const setText = (id, value) => {
-        const element = document.getElementById(id);
-        if (element) element.textContent = value;
+      const numberParam = (name, fallback) => {
+        const value = Number(params.get(name));
+        return Number.isFinite(value) ? value : fallback;
+      };
+      const data = {
+        plate: params.get("plate") || "沪A12345",
+        poi: params.get("poi") || "G60 沪昆高速·嘉兴服务区东侧 2.4km",
+        direction: params.get("direction") || "正东方向（88°）",
+        speed: params.get("speed") || "68 km/h",
+        time: params.get("time") || "--",
+        lat: numberParam("lat", 30.768421),
+        lng: numberParam("lng", 120.684295),
       };
 
-      document.title = `${plate} 车辆实时位置`;
-      setText('plate', plate);
-      setText('plate-detail', plate);
-      setText('waybill', waybill || '未关联运单');
-      setText('poi-summary', poi);
-      setText('poi', poi);
-      setText('direction', direction);
-      setText('direction-detail', direction);
-      setText('speed', speed);
-      setText('speed-detail', speed);
-      setText('last-time', lastTime);
-      setText('coordinate', `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      const setText = (id, value) => {
+        const node = document.getElementById(id);
+        if (node) node.textContent = value;
+      };
+
+      document.title = `${data.plate} 车辆实时位置`;
+      setText("plate", data.plate);
+      setText("detail-plate", data.plate);
+      setText("poi", data.poi);
+      setText("direction", data.direction);
+      setText("detail-direction", data.direction);
+      setText("speed", data.speed);
+      setText("detail-speed", data.speed);
+      setText("time", data.time);
+      setText("coordinate", `${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}`);
+
+      const fallback = document.getElementById("map-fallback");
+      const safePopup = (title, lines) => {
+        const root = document.createElement("div");
+        const strong = document.createElement("strong");
+        strong.textContent = title;
+        root.appendChild(strong);
+        lines.forEach((line) => {
+          const row = document.createElement("div");
+          row.textContent = line;
+          root.appendChild(row);
+        });
+        return root;
+      };
 
       if (window.L) {
-        const fallback = document.getElementById('map-fallback');
-        if (fallback) fallback.hidden = true;
-
-        const map = L.map('map', { zoomControl: true }).setView([lat, lng], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        const map = L.map("map", { zoomControl: true }).setView([data.lat, data.lng], 13);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
           maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors',
         }).addTo(map);
-
-        L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
-        L.circle([lat, lng], {
-          radius: 85,
-          color: '#1d5fd1',
-          weight: 1,
-          fillColor: '#76a7f5',
-          fillOpacity: 0.12,
-        }).addTo(map);
-
-        const vehicleIcon = L.divIcon({
-          className: 'vehicle-map-icon',
-          html: `<div class="vehicle-marker" style="--heading:${safeHeading}deg"><span class="heading-arrow"></span><span class="vehicle-dot">车</span></div>`,
-          iconSize: [42, 42],
-          iconAnchor: [21, 21],
+        const icon = L.divIcon({
+          className: "vehicle-map-icon",
+          html: '<div class="vehicle-marker">车</div>',
+          iconSize: [38, 38],
+          iconAnchor: [19, 19],
+          popupAnchor: [0, -22],
         });
-        const marker = L.marker([lat, lng], { icon: vehicleIcon, zIndexOffset: 1000 }).addTo(map);
-
-        const popup = document.createElement('div');
-        const popupTitle = document.createElement('div');
-        const popupPoi = document.createElement('div');
-        const popupMotion = document.createElement('div');
-        popupTitle.className = 'popup-title';
-        popupPoi.className = 'popup-line';
-        popupMotion.className = 'popup-line';
-        popupTitle.textContent = plate;
-        popupPoi.textContent = poi;
-        popupMotion.textContent = `${direction} · ${speed}`;
-        popup.append(popupTitle, popupPoi, popupMotion);
-        marker.bindPopup(popup);
+        L.marker([data.lat, data.lng], { icon })
+          .addTo(map)
+          .bindPopup(safePopup(`${data.plate} · 定位正常`, [data.poi, `${data.direction} · ${data.speed}`, `最后定位 ${data.time}`]))
+          .openPopup();
+        fallback.hidden = true;
+      } else {
+        fallback.textContent = "地图资源加载失败，请稍后刷新。车辆定位数据仍可在下方查看。";
       }
     </script>
   </body>
