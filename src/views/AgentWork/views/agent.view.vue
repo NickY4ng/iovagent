@@ -6,6 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { storeToRefs } from 'pinia';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 
 import { Icon } from '@packages/icon';
 
@@ -16,6 +17,7 @@ import { strokeIconPaths } from '../strokeIconPaths';
 import { useAgentWorkNav } from '../useAgentWorkNav';
 import WaybillImportDialog from '../component/waybillImport.dialog.vue';
 import AnalysisReportView from './analysisReport.view.vue';
+import KnowledgeBasePanel from '../component/knowledgeBasePanel.comp.vue';
 
 const store = agentWorkData();
 const { agentMessages, agentInput } = storeToRefs(store);
@@ -45,7 +47,7 @@ interface AgentModelOption {
 }
 
 interface NewConversationGuide {
-  action?: 'projectCreate';
+  action?: 'knowledgeBase' | 'projectCreate';
   description: string;
   icon: string;
   iconClass: string;
@@ -118,6 +120,13 @@ const newConversationGuides: NewConversationGuide[] = [
     iconClass: 'bg-orange-50 text-orange-600',
     upload: true,
   },
+  {
+    title: '查询知识库制度/案例',
+    description: '基于知识库 · 自动引用来源',
+    prompt: '发现车辆在非目的地物流园长停，应该怎么处理？',
+    icon: strokeIconPaths.book,
+    iconClass: 'bg-amber-50 text-amber-600',
+  },
 ];
 
 const selectedAgentModel = ref(agentModelOptions[0]!);
@@ -126,11 +135,88 @@ const modelSelectRef = ref<HTMLDivElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const composerTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const uploadedFiles = ref<File[]>([]);
+const messageAttachments = ref<Record<number, string[]>>({});
+
+const KB_ADDED_STORAGE_KEY = 'iovagent_kb_added_attachments';
+
+function loadKbAddedFileNames(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const saved = window.localStorage.getItem(KB_ADDED_STORAGE_KEY);
+    const parsed = saved ? (JSON.parse(saved) as string[]) : [];
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+const kbAddedFileNames = ref<Set<string>>(loadKbAddedFileNames());
+
+function persistKbAddedFileNames() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(KB_ADDED_STORAGE_KEY, JSON.stringify([...kbAddedFileNames.value]));
+}
+
+function isMessageAddedToKb(messageIndex: number) {
+  const names = messageAttachments.value[messageIndex] ?? [];
+  return names.length > 0 && names.every((name) => kbAddedFileNames.value.has(name));
+}
+
+function addMessageAttachmentsToKnowledgeBase(messageIndex: number) {
+  const names = messageAttachments.value[messageIndex] ?? [];
+  if (names.length === 0) return;
+  const next = new Set(kbAddedFileNames.value);
+  names.forEach((name) => next.add(name));
+  kbAddedFileNames.value = next;
+  persistKbAddedFileNames();
+  ElMessage.success(`已将 ${names.length} 个文件加入知识库解析队列`);
+}
 const isFileDragActive = ref(false);
 const isRightPanelVisible = ref(store.workspaceMode === 'project');
 const filePickerPurpose = ref<'regular' | 'waybill'>('regular');
 const pendingWaybillImport = ref<PendingWaybillImport | null>(null);
 let fileDragDepth = 0;
+
+const isKbPanelOpen = ref(false);
+const kbPanelRef = ref<HTMLDivElement | null>(null);
+const composerHighlightRef = ref<HTMLDivElement | null>(null);
+
+const citationModalOpen = ref(false);
+const citationModalSources = ref<{ name: string; summary: string; format?: string }[]>([]);
+
+function toggleKbPanel() {
+  isKbPanelOpen.value = !isKbPanelOpen.value;
+}
+
+function insertKbScope(scope: string) {
+  const current = agentInput.value;
+  agentInput.value = current ? `${current} ${scope} ` : `${scope} `;
+  isKbPanelOpen.value = false;
+  nextTick(() => composerTextareaRef.value?.focus());
+}
+
+const highlightedInput = computed(() => {
+  let text = agentInput.value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  text = text.replace(/(@[^@\s]+)/g, '<span style="border-radius:4px;background:#eff6ff;color:#2563eb;padding:0 4px;">$1</span>');
+  return text || '<br>';
+});
+
+function syncComposerScroll() {
+  if (!composerTextareaRef.value || !composerHighlightRef.value) return;
+  composerHighlightRef.value.scrollTop = composerTextareaRef.value.scrollTop;
+}
+
+function openCitationModal(sources: { name: string; summary: string; format?: string }[]) {
+  citationModalSources.value = sources;
+  citationModalOpen.value = true;
+}
+
+function closeCitationModal() {
+  citationModalOpen.value = false;
+}
 
 function setRightPanel(key: string) {
   store.rightPanel = key;
@@ -169,6 +255,9 @@ function selectAgentModel(option: AgentModelOption) {
 function closeComposerMenusOnOutside(event: MouseEvent) {
   if (!modelSelectRef.value?.contains(event.target as Node)) {
     isModelSelectOpen.value = false;
+  }
+  if (!kbPanelRef.value?.contains(event.target as Node)) {
+    isKbPanelOpen.value = false;
   }
 }
 
@@ -215,6 +304,10 @@ function selectNewConversationGuide(guide: NewConversationGuide) {
     goPage('projectCreate');
     return;
   }
+  if (guide.action === 'knowledgeBase') {
+    goPage('knowledgeBase');
+    return;
+  }
   agentInput.value = guide.prompt;
   if (guide.upload) openFilePicker(guide.uploadPurpose ?? 'regular');
   nextTick(() => composerTextareaRef.value?.focus());
@@ -230,7 +323,9 @@ function handleFileSelect(event: Event) {
 }
 
 function removeUploadedFile(index: number) {
+function removeUploadedFile(index: number) {
   uploadedFiles.value = uploadedFiles.value.filter((_, fileIndex) => fileIndex !== index);
+}
 }
 
 function handleComposerDragEnter() {
@@ -275,7 +370,10 @@ function sendComposerMessage() {
   if (!text && uploadedFiles.value.length === 0) return;
 
   if (uploadedFiles.value.length > 0) {
-    const attachmentText = `附件：${uploadedFiles.value.map((file) => file.name).join('、')}`;
+    const fileNames = uploadedFiles.value.map((file) => file.name);
+    const attachmentText = `附件：${fileNames.join('、')}`;
+    const userMessageIndex = agentMessages.value.length;
+    messageAttachments.value = { ...messageAttachments.value, [userMessageIndex]: fileNames };
     sendAgent(text ? `${text}\n${attachmentText}` : attachmentText);
     uploadedFiles.value = [];
     agentInput.value = '';
@@ -283,6 +381,31 @@ function sendComposerMessage() {
   }
 
   sendAgent();
+}
+
+interface CitedTextSegment {
+  content: string;
+  source?: { name: string; summary: string };
+  type: 'text' | 'cite';
+}
+
+function splitCitedText(text: string, sources?: { name: string; summary: string }[]): CitedTextSegment[] {
+  const segments: CitedTextSegment[] = [];
+  const regex = /\[(\d+)\]/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+    }
+    const sourceIndex = Number(match[1]) - 1;
+    segments.push({ type: 'cite', content: match[1], source: sources?.[sourceIndex] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ type: 'text', content: text.slice(lastIndex) });
+  }
+  return segments;
 }
 
 function formatStepNumber(index: number) {
@@ -676,11 +799,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div v-for="(m, i) in agentMessages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
+            <div class="flex max-w-[86%] flex-col" :class="m.role === 'user' ? 'items-end' : 'items-start'">
             <div
               class="rounded-md px-4 py-3 text-sm leading-6"
               :class="[
-                m.role === 'user' ? 'max-w-[72%] bg-slate-900 text-white' : 'border border-[#deded9] bg-white text-slate-700',
-                m.title ? 'max-w-[86%]' : 'max-w-[72%]',
+                m.role === 'user' ? 'max-w-full bg-slate-900 text-white' : 'border border-[#deded9] bg-white text-slate-700',
+                m.title ? 'max-w-full' : '',
               ]"
             >
             <template v-if="m.role === 'agent' && m.title">
@@ -771,8 +895,63 @@ onBeforeUnmount(() => {
               </a>
             </template>
             <template v-else>
-              <span class="whitespace-pre-line">{{ m.text }}</span>
+              <span
+                v-for="(segment, segmentIndex) in splitCitedText(m.text, m.sources)"
+                :key="segmentIndex"
+                class="inline"
+              >
+                <template v-if="segment.type === 'text'"
+                  ><span class="whitespace-pre-line">{{ segment.content }}</span></template
+                >
+                <template v-else>
+                  <span class="group relative inline-block align-middle"
+                    >
+                    <span
+                      class="inline-flex h-4 min-w-[16px] cursor-default items-center justify-center rounded bg-blue-100 px-1 text-[10px] font-semibold leading-none text-blue-700"
+                    >
+                      {{ segment.content }}
+                    </span>
+                    <div
+                      v-if="segment.source"
+                      class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden w-56 -translate-x-1/2 rounded-md border border-[#deded9] bg-white p-2 text-xs leading-4 text-slate-600 shadow-lg group-hover:block"
+                    >
+                      <div class="mb-1 font-semibold text-slate-900">{{ segment.source.name }}</div>
+                      <div>{{ segment.source.summary }}</div>
+                    </div>
+                  </span>
+                </template>
+              </span>
             </template>
+            <div v-if="m.sources?.length" class="mt-3">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500 transition hover:bg-slate-100"
+                @click="openCitationModal(m.sources)"
+              >
+                <Icon :svg="strokeIconPaths.book" :size="12" svg-class="text-slate-400" />
+                共引用 {{ m.sources.length }} 篇知识库资料
+              </button>
+            </div>
+            </div>
+            <div
+              v-if="m.role === 'user' && messageAttachments[i]?.length"
+              class="mt-1.5 flex items-center gap-2.5 rounded-md border border-[#e6e6e2] bg-[#f7f7f5] px-3 py-1.5"
+            >
+              <span class="text-[11px] text-slate-500">{{ messageAttachments[i].length }} 个附件</span>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition"
+                :class="
+                  isMessageAddedToKb(i)
+                    ? 'cursor-default bg-emerald-50 text-emerald-700'
+                    : 'bg-white text-slate-700 shadow-sm hover:bg-slate-900 hover:text-white'
+                "
+                @click="addMessageAttachmentsToKnowledgeBase(i)"
+              >
+                <Icon :svg="isMessageAddedToKb(i) ? strokeIconPaths.check : strokeIconPaths.book" :size="11" />
+                {{ isMessageAddedToKb(i) ? '已加入知识库' : '将文件加入知识库' }}
+              </button>
+            </div>
             </div>
           </div>
         </div>
@@ -827,14 +1006,23 @@ onBeforeUnmount(() => {
                 </button>
               </div>
             </div>
-            <textarea
-              ref="composerTextareaRef"
-              v-model="agentInput"
-              class="min-h-[40px] w-full resize-none bg-transparent px-1 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
-              placeholder="发消息..."
-              rows="1"
-              @keydown.enter.exact.prevent="sendComposerMessage"
-            />
+            <div class="relative">
+              <div
+                ref="composerHighlightRef"
+                aria-hidden="true"
+                class="pointer-events-none absolute inset-0 z-0 overflow-hidden whitespace-pre-wrap break-words px-1 py-0 text-sm leading-6 text-slate-800"
+                v-html="highlightedInput"
+              />
+              <textarea
+                ref="composerTextareaRef"
+                v-model="agentInput"
+                class="composer-textarea relative z-10 min-h-[40px] w-full resize-none bg-transparent px-1 text-sm leading-6 outline-none placeholder:text-slate-400"
+                placeholder="发消息..."
+                rows="1"
+                @keydown.enter.exact.prevent="sendComposerMessage"
+                @scroll="syncComposerScroll"
+              />
+            </div>
             <div class="mt-1 flex items-center justify-between gap-3">
               <div class="flex min-w-0 items-center gap-1.5">
                 <input ref="fileInputRef" type="file" class="hidden" multiple @change="handleFileSelect" />
@@ -847,6 +1035,23 @@ onBeforeUnmount(() => {
                 >
                   <Icon :svg="strokeIconPaths.paperclip" :size="17" />
                 </button>
+                <div ref="kbPanelRef" class="relative shrink-0">
+                  <button
+                    type="button"
+                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-600 transition hover:bg-[#f3f3f1] hover:text-slate-900"
+                    aria-label="知识库"
+                    title="选择知识库范围 / 管理知识库"
+                    @click.stop="toggleKbPanel"
+                  >
+                    <Icon :svg="strokeIconPaths.book" :size="16" />
+                  </button>
+                  <div
+                    v-if="isKbPanelOpen"
+                    class="absolute bottom-full left-0 z-30 mb-3"
+                  >
+                    <KnowledgeBasePanel @select="insertKbScope" />
+                  </div>
+                </div>
                 <div ref="modelSelectRef" class="relative min-w-0 shrink">
                   <button
                     type="button"
@@ -1205,6 +1410,54 @@ onBeforeUnmount(() => {
       </template>
     </div>
   </div>
+
+  <div
+    v-if="citationModalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+    @click.self="closeCitationModal"
+  >
+    <div class="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-[#deded9] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.18)]">
+      <div class="flex h-12 items-center justify-between border-b border-[#eeeeec] px-4">
+        <h3 class="text-sm font-semibold text-slate-900">知识库引用来源</h3>
+        <button
+          type="button"
+          class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-[#f2f2ef] hover:text-slate-700"
+          @click="closeCitationModal"
+        >
+          <Icon :svg="strokeIconPaths.x" :size="15" />
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-4">
+        <div class="mb-3 text-xs text-slate-500">共引用 {{ citationModalSources.length }} 篇资料</div>
+        <div class="space-y-3">
+          <div
+            v-for="(source, index) in citationModalSources"
+            :key="source.name"
+            class="rounded-lg border border-[#deded9] bg-[#fafaf8] p-3"
+          >
+            <div class="flex items-center gap-2">
+              <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-blue-100 text-[10px] font-semibold text-blue-700">
+                {{ index + 1 }}
+              </span>
+              <span class="min-w-0 flex-1 text-sm font-medium text-slate-900">{{ source.name }}</span>
+              <span v-if="source.format" class="shrink-0 rounded border border-[#deded9] bg-white px-1.5 py-0.5 text-[10px] text-slate-500">{{ source.format }}</span>
+            </div>
+            <p class="mt-2 text-xs leading-5 text-slate-600">{{ source.summary }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end border-t border-[#eeeeec] px-4 py-3">
+        <button
+          type="button"
+          class="rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-slate-800"
+          @click="closeCitationModal"
+        >
+          关闭
+        </button>
+      </div>
+    </div>
+  </div>
+
   <WaybillImportDialog
     :file-names="pendingWaybillImport?.files.map((file) => file.name) ?? []"
     :imported-count="pendingWaybillImport?.importedCount ?? 0"
@@ -1216,6 +1469,15 @@ onBeforeUnmount(() => {
 </template>
 
 <style lang="scss" scoped>
+.composer-textarea {
+  color: transparent;
+  caret-color: #0f172a;
+}
+
+.composer-textarea::placeholder {
+  color: #94a3b8;
+}
+
 :deep(.leaflet-container) {
   background: #e2e8f0;
   color: #0f172a;

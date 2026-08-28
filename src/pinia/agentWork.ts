@@ -125,23 +125,55 @@ const projectWelcomeMessages: ChatMessage[] = [
   { role: 'agent', text: '发现 2 单非目的地物流园长停、1 单 GPS 轨迹疑似造假，建议优先复核。' },
 ];
 
+
 const conversationSeeds: AgentConversation[] = [
-  ['C001', '今日在途异常处理建议', '今天有哪些真正需要优先处理的在途异常？', '已汇总高风险运单，并按影响程度给出处理顺序。', '10分钟前'],
-  ['C002', '沪A12345当前位置查询', '查询沪A12345现在的位置。', '车辆最新定位在 G60 沪昆高速嘉兴服务区东侧，定位状态正常。', '26分钟前'],
-  ['C003', '华东线路高风险运单复核', '复核华东线路今天的高风险运单。', '已完成复核，建议优先人工核验 3 单。', '今天 09:42'],
-  ['C004', '8月16日在途日报', '生成昨天的在途运输日报。', '日报已生成，包含运单规模、异常分布和处理建议。', '昨天'],
-  ['C005', '承运商异常集中度分析', '分析近期异常是否集中在特定承运商。', '异常主要集中在安捷物流与远恒运输，已整理对应线路。', '昨天'],
-  ['C006', '皖K55821停车事件复盘', '复盘皖K55821的异常停车。', '该车存在一次合理休息和一次高风险非合同经停。', '8月15日'],
-  ['C007', '冷链到货时效预测', '预测冷链项目今晚的到货情况。', '预计 61 单按时到达，3 单存在延误风险。', '8月14日'],
-].map(([id, title, userText, agentText, updatedAt]) => ({
-  id,
-  title,
-  updatedAt,
-  messages: [
-    { role: 'user', text: userText },
-    { role: 'agent', text: agentText },
-  ],
-}));
+  {
+    id: 'APAAS-CASE-001',
+    title: 'apaas 调用总览：车辆数与轨迹车天数',
+    updatedAt: '刚刚',
+    messages: [
+      { role: 'user', text: '我们通过 apaas 调用过多少车？' },
+      { role: 'agent', text: '你的账号累计通过 apaas 调用过 86 辆车。其中黄牌车 62 辆、蓝牌车 15 辆、绿牌（新能源）车 9 辆。' },
+      { role: 'user', text: '一共调用了多少轨迹车天数？' },
+      { role: 'agent', text: '累计轨迹车天数共 1,240 天，平均每辆车 14.4 天。调用天数最多的是 冀E03166D，累计 28 天。' },
+    ],
+  },
+  {
+    id: 'APAAS-CASE-002',
+    title: '单车查询：冀E03166D 颜色与调用天数',
+    updatedAt: '昨天',
+    messages: [
+      { role: 'user', text: '冀E03166D 是什么颜色的车牌？调用过多少轨迹车天数？' },
+      { role: 'agent', text: '冀E03166D 是黄牌车。该车累计通过 apaas 调用轨迹车天数 28 天，首次调用日期 2026-05-09，最近一次调用日期 2026-08-25。' },
+      { role: 'user', text: '还有哪些车调用天数超过 20 天？' },
+      { role: 'agent', text: '除 冀E03166D（28 天）外，调用天数超过 20 天的车辆还有 3 辆：鲁Q98765（25 天）、粤B24680（23 天）、沪A12345（21 天）。' },
+    ],
+  },
+  {
+    id: 'APAAS-CASE-003',
+    title: '时间段查询：7 月车辆与轨迹车天数',
+    updatedAt: '2天前',
+    messages: [
+      { role: 'user', text: '7 月调用过哪些车，每辆车多少轨迹车天数？' },
+      { role: 'agent', text: '2026 年 7 月共通过 apaas 调用 42 辆车，合计产生轨迹车天数 386 天。调用天数前 5：冀E03166D（12 天）、鲁Q98765（11 天）、粤B24680（10 天）、沪A12345（9 天）、苏E56789（9 天），其余 37 辆车各调用 1 至 8 天。' },
+      { role: 'user', text: '那 冀E03166D 在 8 月还有调用吗？' },
+      { role: 'agent', text: '有。2026 年 8 月（截至 8 月 25 日），冀E03166D 通过 apaas 产生轨迹调用 9 天，最近一次为 2026-08-25。' },
+    ],
+  },
+  {
+    id: 'APAAS-CASE-004',
+    title: 'apaas 调用明细查询与 Excel 下载',
+    updatedAt: '3天前',
+    messages: [
+      { role: 'user', text: '查一下 冀E03166D 的 apaas 调用明细' },
+      { role: 'agent', text: '冀E03166D（黄牌）累计调用 28 天，明细按日期列出：2026-05-09、2026-05-15、2026-05-22、2026-05-28、2026-06-03 至 2026-06-05、2026-07-01 至 2026-07-12（12 天）、2026-08-10 至 2026-08-25（9 天），其中 5 月 4 天、6 月 3 天、7 月 12 天、8 月 9 天。' },
+      { role: 'user', text: '帮我把 7 月的调用明细导成 Excel' },
+      { role: 'agent', text: '已生成 2026 年 7 月 apaas 调用明细：共 42 辆车、386 行记录（按车按天），含车牌号、车牌颜色、调用日期、轨迹车天数四个字段。点击下载：apaas 调用明细_202607.xlsx ⬇' },
+      { role: 'user', text: '再导一份 冀E03166D 全部时间段的' },
+      { role: 'agent', text: '已生成 冀E03166D 全时段调用明细：共 28 行记录，时间跨度 2026-05-09 至 2026-08-25。点击下载：apaas 调用明细_冀E03166D.xlsx ⬇' },
+    ],
+  },
+];
 
 function cloneChatMessages(messages: ChatMessage[]) {
   return messages.map((message) => ({
@@ -160,7 +192,7 @@ const tmsSyncCustomersSeed: TmsSyncCustomer[] = [
     userPhone: '13800138000',
     systemUrl: 'https://tms.huadong.example.com/login',
     account: 'huadong_ops',
-    password: 'Hdtms@2026',
+    password: '********',
     status: '未处理',
     submittedAt: '2026-08-12 10:24',
   },
@@ -170,7 +202,7 @@ const tmsSyncCustomersSeed: TmsSyncCustomer[] = [
     userPhone: '13900139000',
     systemUrl: 'https://tms.coldchain.example.com/login',
     account: 'cold_ops',
-    password: 'Cold@2026',
+    password: '********',
     status: '已处理',
     submittedAt: '2026-08-11 16:42',
     processedBy: '王运营',
@@ -931,6 +963,133 @@ function createAnalysisReportProcessMessage(request: AnalysisReportRequest): Cha
   };
 }
 
+const knowledgeBaseIntentTerms = ['知识库', '制度', 'SOP', '规范', '办法', '标准', '赔付', '理赔', '考核', '合同', '案例', '怎么处理', '如何处理', '怎么判定', '规则'];
+const knowledgeBaseScopeTerms: Record<string, string> = {
+  案例库: '案例库',
+  案例: '案例库',
+  合同与赔付标准: '合同与赔付标准',
+  赔付: '合同与赔付标准',
+  理赔: '合同与赔付标准',
+  合同: '合同与赔付标准',
+  '运营制度/SOP': '运营制度/SOP',
+  运营制度: '运营制度/SOP',
+  SOP: '运营制度/SOP',
+  制度: '运营制度/SOP',
+  规范: '运营制度/SOP',
+  办法: '运营制度/SOP',
+  考核: '运营制度/SOP',
+};
+
+interface KnowledgeBaseAnswer {
+  question: string;
+  answer: string;
+  sources: { name: string; summary: string }[];
+}
+
+const knowledgeBaseAnswers: KnowledgeBaseAnswer[] = [
+  {
+    question: '赔付',
+    answer:
+      '根据《货损货差赔付标准》第 3.2 条，当运输过程中发生货物损坏、短缺或延误时，承运方需启动赔付流程。赔付申请材料主要包括四部分：一是原始运单及签收凭证，用于证明运输合同关系和货物交付状态；二是货物异常现场照片，需清晰展示受损部位、包装状态及车牌信息；三是货值证明，如发票、采购合同或报价单，用于核定实际损失金额；四是第三方检验报告，当货值较高或责任存在争议时，需由具备资质的检验机构出具。[1] 赔付比例方面，标准规定在承运方全责情况下，可赔付实际损失的 80%–95%，具体比例根据货物类别、保价金额及合同条款综合确定。若托运方已购买足额保价运输，则按保价金额与实际损失较低者赔付；未保价货物通常按运费 3–7 倍或约定限额赔付，但最高不超过实际损失。[2]',
+    sources: [
+      { name: '货损货差赔付标准.pdf', summary: '货物损坏、短缺、延误的赔付比例、举证要求和审批流程。' },
+      { name: '运输合同模板_通用版.docx', summary: '标准运输合同条款，包含责任边界、异常责任和结算规则。' },
+      { name: '承运商服务等级协议SLA.pdf', summary: '不同等级承运商的服务承诺、违约责任和赔付上限。' },
+      { name: '在途异常处理SOP_V3.2.pdf', summary: '定义异常停车、轨迹造假、非计划经停等场景的处理流程、责任人和升级规则。' },
+      { name: '华东干线在途监控日报模板.xlsx', summary: '日报字段、统计口径及异常运单汇总模板。' },
+      { name: '冷链到货时效管理规范.docx', summary: '冷链城配线路的时效要求、温控异常处理及到货确认标准。' },
+      { name: '车辆GPS轨迹真实性校验规范.pdf', summary: 'GPS断点、速度跳变、点火状态不一致等异常识别方法。' },
+    ],
+  },
+  {
+    question: '非目的地物流园长停',
+    answer:
+      '参考《在途异常处理SOP》第 5 条，当系统识别到车辆在非目的地物流园或货场长时间停靠，且停靠时长超过阈值（默认 60 分钟）时，会自动标记为高风险异常停车。运营人员需在 30 分钟内联系司机核实原因，要求司机提供现场照片、货物封签状态及停靠点 POI 信息，并同步承运商调度进行复核。[1] 处置动作分为三步：第一步，通过智能体或 TMS 确认该停靠点是否为客户授权的中转仓、临时卸货点或维修点；第二步，若未经授权，要求司机说明原因并保留通话录音、微信记录等证据；第三步，根据风险等级决定是否升级至安全部门或客户侧进行人工介入。[2] 典型案例方面，《皖K55821第三方中转仓经停案例》详细复盘了合肥仓→南京仓线路中，车辆在第三方中转仓非合同经停 73 分钟的处置过程。[3]',
+    sources: [
+      { name: '在途异常处理SOP_V3.2.pdf', summary: '定义异常停车、轨迹造假、非计划经停等场景的处理流程、责任人和升级规则。' },
+      { name: '皖K55821第三方中转仓经停案例.pdf', summary: '合肥仓→南京仓线路中，车辆在第三方中转仓非合同经停的处置与复盘。' },
+      { name: '非目的地物流园长停处置细则.pdf', summary: '非计划停靠点的识别规则、处置动作和升级流程。' },
+      { name: '车辆GPS轨迹真实性校验规范.pdf', summary: 'GPS断点、速度跳变、点火状态不一致等异常识别方法。' },
+      { name: '承运商履约考核办法_2026Q3.docx', summary: '承运商KPI指标、评分规则、奖惩标准及月度考核输出模板。' },
+      { name: '冷链到货时效管理规范.docx', summary: '冷链城配线路的时效要求、温控异常处理及到货确认标准。' },
+      { name: '华东干线在途监控日报模板.xlsx', summary: '日报字段、统计口径及异常运单汇总模板。' },
+    ],
+  },
+  {
+    question: '承运商考核',
+    answer:
+      '依据《承运商履约考核办法》第 2 章，承运商月度考核采用百分制，核心指标包括五大类：一是到货准时率，权重 30%；二是异常率，权重 25%；三是轨迹完整率，权重 20%；四是客户投诉率，权重 15%；五是回单及时率，权重 10%。[1] 评分规则上，每个指标设置目标值、警戒值和红线值。达到目标值得满分，介于警戒值与目标值之间按比例扣分，低于警戒值不得分，触及红线值则当月考核直接降级。[2] 考核结果与奖惩直接挂钩：月度评分 90 分以上为 A 级，可获得优先派单权和奖励系数；80–89 分为 B 级，正常结算；70–79 分为 C 级，触发整改通知并限制新线路分配；70 分以下为 D 级，暂停合作并启动清退评估。[3]',
+    sources: [
+      { name: '承运商履约考核办法_2026Q3.docx', summary: '承运商KPI指标、评分规则、奖惩标准及月度考核输出模板。' },
+      { name: '承运商服务等级协议SLA.pdf', summary: '不同等级承运商的服务承诺、违约责任和赔付上限。' },
+      { name: '在途异常事件分类与编码.xlsx', summary: '异常事件分类、编码规则及关联责任方定义。' },
+      { name: '华东干线在途监控日报模板.xlsx', summary: '日报字段、统计口径及异常运单汇总模板。' },
+      { name: '在途异常处理SOP_V3.2.pdf', summary: '定义异常停车、轨迹造假、非计划经停等场景的处理流程、责任人和升级规则。' },
+      { name: '车辆GPS轨迹真实性校验规范.pdf', summary: 'GPS断点、速度跳变、点火状态不一致等异常识别方法。' },
+      { name: '货损货差赔付标准.pdf', summary: '货物损坏、短缺、延误的赔付比例、举证要求和审批流程。' },
+    ],
+  },
+  {
+    question: '轨迹造假',
+    answer:
+      '根据《沪A12345轨迹造假复核案例》和《在途异常处理SOP》：GPS 出现断点、速度跳变且点火状态与定位连续性不一致时，判定为轨迹可信度异常，需启动轨迹真实性复核并保留证据。[1][2] 处罚结果方面，承运商被认定为严重违约，当月考核直接评为 D 级，暂停新线路分配 3 个月；涉事车辆列入黑名单，6 个月内不得承接高价值货物运输；同时依据《承运商服务等级协议SLA》，对本次异常处以违约金并要求提交书面整改报告。[3]',
+    sources: [
+      { name: '沪A12345轨迹造假复核案例.pdf', summary: 'GPS断点、速度跳变与点火状态冲突的轨迹造假识别和取证过程。' },
+      { name: '在途异常处理SOP_V3.2.pdf', summary: '定义异常停车、轨迹造假、非计划经停等场景的处理流程、责任人和升级规则。' },
+      { name: '车辆GPS轨迹真实性校验规范.pdf', summary: 'GPS断点、速度跳变、点火状态不一致等异常识别方法。' },
+      { name: '承运商服务等级协议SLA.pdf', summary: '不同等级承运商的服务承诺、违约责任和赔付上限。' },
+      { name: '承运商履约考核办法_2026Q3.docx', summary: '承运商KPI指标、评分规则、奖惩标准及月度考核输出模板。' },
+      { name: '皖K55821第三方中转仓经停案例.pdf', summary: '合肥仓→南京仓线路中，车辆在第三方中转仓非合同经停的处置与复盘。' },
+      { name: '华东干线在途监控日报模板.xlsx', summary: '日报字段、统计口径及异常运单汇总模板。' },
+    ],
+  },
+];
+
+function hasKnowledgeBaseIntent(raw: string) {
+  return knowledgeBaseIntentTerms.some((term) => raw.includes(term));
+}
+
+function resolveKnowledgeBaseScope(raw: string) {
+  for (const [term, scope] of Object.entries(knowledgeBaseScopeTerms)) {
+    if (raw.includes(term)) return scope;
+  }
+  return '全部知识库';
+}
+
+function matchKnowledgeBaseAnswer(raw: string): KnowledgeBaseAnswer {
+  const lowerRaw = raw.toLowerCase();
+  const directMatch = knowledgeBaseAnswers.find((item) => item.question.split(' ').some((term) => lowerRaw.includes(term.toLowerCase())));
+  if (directMatch) return directMatch;
+  return {
+    question: raw,
+    answer:
+      '已从知识库中检索到相关制度与案例。由于问题较宽泛，建议你补充具体场景（如车型、线路、异常类型），或直接使用 @文件夹名 限定检索范围。',
+    sources: [
+      { name: '在途异常处理SOP_V3.2.pdf', summary: '定义异常停车、轨迹造假、非计划经停等场景的处理流程、责任人和升级规则。' },
+      { name: '货损货差赔付标准.pdf', summary: '货物损坏、短缺、延误的赔付比例、举证要求和审批流程。' },
+    ],
+  };
+}
+
+function createKnowledgeBaseProcessMessage(raw: string): ChatMessage {
+  const scope = resolveKnowledgeBaseScope(raw);
+  const matched = matchKnowledgeBaseAnswer(raw);
+  return {
+    role: 'agent',
+    title: '知识库检索',
+    status: '已完成',
+    text: `正在${scope === '全部知识库' ? '检索全部知识库' : `在“${scope}”中检索`}，并基于检索结果生成引用回答。`,
+    progressMode: true,
+    steps: [
+      { title: '解析检索范围', text: scope === '全部知识库' ? '未限定文件夹，默认检索全部知识库。' : `识别到限定范围：${scope}。` },
+      { title: '向量召回相关片段', text: '基于 Embedding 召回 Top-K 相关文本片段，并过滤低相关度结果。', skill: '知识库检索' },
+      { title: '生成引用回答', text: '结合召回片段生成回答，并标注来源文件名与 80 字摘要。' },
+    ],
+    result: matched.answer,
+    sources: matched.sources,
+  };
+}
+
 function formatFileTimestamp(date: Date) {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
@@ -1395,6 +1554,14 @@ export const agentWorkData = defineStore('agentWork', {
         const processMessage = createVehiclePositionProcessMessage(plate, location);
         this.startDelayedAgentProcess(next, processMessage, () => {
           this.openExternalH5(processMessage.link!.url, processMessage.link!.title);
+        });
+        this.agentInput = '';
+        return;
+      }
+      if (hasKnowledgeBaseIntent(raw)) {
+        const processMessage = createKnowledgeBaseProcessMessage(raw);
+        this.startDelayedAgentProcess(next, processMessage, () => {
+          this.rightPanel = 'overview';
         });
         this.agentInput = '';
         return;
