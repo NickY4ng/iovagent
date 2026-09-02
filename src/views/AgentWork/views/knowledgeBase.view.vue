@@ -391,7 +391,7 @@ onBeforeUnmount(() => {
                 <h2 class="text-base font-semibold text-slate-900">平台数据资产</h2>
               </div>
               <p class="mt-1 pl-9 text-xs text-slate-500">
-                来自你在大卡数字人、灵动、apaas 中的业务调用，已自动沉淀为可检索知识
+                来自你在大卡数字人中的业务调用，已自动沉淀为可检索知识
               </p>
             </div>
 
@@ -482,7 +482,7 @@ onBeforeUnmount(() => {
                 <h3 class="text-sm font-semibold text-slate-900">
                   {{ assetDetailTab === 'vehicle' ? '车辆使用 · Top 10' : assetDetailTab === 'line' ? '路线覆盖 · Top 10' : '运单起终点企业' }}
                 </h3>
-                <p class="mt-0.5 text-xs text-slate-500">{{ props.emptyMode ? '数据沉淀后将按运单覆盖与调用次数排序' : '按运单覆盖与调用次数排序' }}</p>
+                <p class="mt-0.5 text-xs text-slate-500">{{ props.emptyMode ? '数据沉淀后将按运单覆盖排序' : '按运单覆盖排序' }}</p>
               </div>
               <div class="flex items-center gap-1 rounded-lg border border-[#e3e3df] bg-white p-1">
                 <button
